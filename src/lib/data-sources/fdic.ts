@@ -53,6 +53,7 @@ export async function searchFdicInstitutions(
     state: row.STALP ?? null,
     fdic_cert: String(row.CERT),
     sec_cik: null,
+    ncua_charter: null,
   }));
 }
 

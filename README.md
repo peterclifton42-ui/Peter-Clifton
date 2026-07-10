@@ -6,16 +6,17 @@ rationale grounded in the specific metrics and headlines found.
 
 ## How it works
 
-1. **Search** — `/api/fi/search` queries the FDIC BankFind API (banks/thrifts) and
-   SEC EDGAR's company list (public companies/holding companies) live, in
-   parallel, and merges the results.
+1. **Search** — `/api/fi/search` queries the FDIC BankFind API (banks/thrifts),
+   NCUA's credit union directory, and SEC EDGAR's company list (public
+   companies/holding companies) live, in parallel, and merges the results.
 2. **Select** — picking a result persists it to the `financial_institutions`
    table in Supabase (`/api/fi`).
 3. **Ingest** — `/api/fi/[id]/ingest` fetches:
    - Financials: FDIC quarterly call-report data (assets, deposits, ROA, ROE,
-     efficiency ratio, NIM, YoY growth) for banks, or SEC XBRL company facts
+     efficiency ratio, NIM, YoY growth) for banks; SEC XBRL company facts
      (assets, net income, equity, deposits, revenue) for SEC-registered
-     institutions.
+     institutions; or NCUA's credit union profile (total assets, membership)
+     for credit unions.
    - News: Google News RSS for the institution's name.
    Both are cached in Supabase (`fi_financials`, `fi_news`).
 4. **Analyze** — `/api/fi/[id]/match` sends the institution's financial profile,
@@ -30,11 +31,16 @@ triggers used to match it.
 
 ## Known gaps
 
-- **Credit unions aren't searchable yet.** FDIC only covers FDIC-insured banks;
-  credit unions are NCUA-insured and need a separate data source (NCUA doesn't
-  offer a simple REST API — would require ingesting their bulk call-report
-  files). The `credit_union` / `ncua_charter` schema is already in place for
-  this.
+- **Credit union financials are shallower than bank financials.** NCUA doesn't
+  publish a documented public API — `src/lib/data-sources/ncua.ts` calls the
+  same internal endpoints that back NCUA's own "Research a Credit Union" tool
+  (reverse-engineered from its compiled JS), which only expose total assets
+  and membership count per credit union. Deeper call-report ratios (deposits,
+  net income, ROA, efficiency ratio — comparable to what FDIC gives banks)
+  are only published as quarterly bulk ZIP downloads
+  (ncua.gov/analysis/credit-union-corporate-call-report-data/quarterly-data),
+  which is a much heavier batch-ingestion job better suited to a scheduled
+  job than a live per-click refresh.
 - Financials/news are only as fresh as the last "Refresh" click — there's no
   background refresh job yet.
 

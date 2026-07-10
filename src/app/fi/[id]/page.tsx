@@ -25,6 +25,7 @@ const METRIC_LABELS: Record<string, string> = {
   net_interest_margin_pct: "Net interest margin (%)",
   deposit_growth_yoy_pct: "Deposit growth YoY (%)",
   asset_growth_yoy_pct: "Asset growth YoY (%)",
+  member_count: "Members",
 };
 
 function formatMetricValue(value: number | string | null): string {

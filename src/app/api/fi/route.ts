@@ -19,6 +19,8 @@ export async function POST(req: NextRequest) {
   const orFilters: string[] = [];
   if (candidate.fdic_cert) orFilters.push(`fdic_cert.eq.${candidate.fdic_cert}`);
   if (candidate.sec_cik) orFilters.push(`sec_cik.eq.${candidate.sec_cik}`);
+  if (candidate.ncua_charter)
+    orFilters.push(`ncua_charter.eq.${candidate.ncua_charter}`);
 
   if (orFilters.length > 0) {
     const { data: existing } = await supabase
@@ -41,6 +43,7 @@ export async function POST(req: NextRequest) {
       state: candidate.state,
       fdic_cert: candidate.fdic_cert,
       sec_cik: candidate.sec_cik,
+      ncua_charter: candidate.ncua_charter,
     })
     .select("*")
     .single();

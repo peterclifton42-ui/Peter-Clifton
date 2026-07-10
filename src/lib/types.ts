@@ -75,11 +75,12 @@ export interface FiProductMatch {
 
 /** Candidate returned by the live FI search endpoint (not yet persisted). */
 export interface FiSearchCandidate {
-  source: "fdic" | "sec_edgar";
+  source: "fdic" | "sec_edgar" | "ncua";
   name: string;
   fi_type: FiType;
   city: string | null;
   state: string | null;
   fdic_cert: string | null;
   sec_cik: string | null;
+  ncua_charter: string | null;
 }

@@ -63,12 +63,16 @@ export default function FiSearch() {
         disabled={selecting}
       />
       {loading && (
-        <p className="mt-2 text-sm text-zinc-500">Searching FDIC and SEC EDGAR...</p>
+        <p className="mt-2 text-sm text-zinc-500">
+          Searching FDIC, NCUA, and SEC EDGAR...
+        </p>
       )}
       {candidates.length > 0 && (
         <ul className="mt-3 divide-y divide-zinc-200 rounded-lg border border-zinc-200 bg-white shadow-sm dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
           {candidates.map((c, i) => (
-            <li key={`${c.source}-${c.fdic_cert ?? c.sec_cik}-${i}`}>
+            <li
+              key={`${c.source}-${c.fdic_cert ?? c.sec_cik ?? c.ncua_charter}-${i}`}
+            >
               <button
                 onClick={() => selectCandidate(c)}
                 disabled={selecting}
@@ -83,7 +87,11 @@ export default function FiSearch() {
                   )}
                 </span>
                 <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-800">
-                  {c.source === "fdic" ? "FDIC" : "SEC"}
+                  {c.source === "fdic"
+                    ? "FDIC"
+                    : c.source === "ncua"
+                      ? "NCUA"
+                      : "SEC"}
                 </span>
               </button>
             </li>

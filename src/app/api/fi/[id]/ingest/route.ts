@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { getFdicFinancials } from "@/lib/data-sources/fdic";
 import { getSecFinancials } from "@/lib/data-sources/sec";
+import { getNcuaFinancials } from "@/lib/data-sources/ncua";
 import { getNewsForFi } from "@/lib/data-sources/news";
 import type { FinancialInstitution } from "@/lib/types";
 
@@ -55,6 +56,33 @@ export async function POST(
       }
     } catch (e) {
       errors.push(`SEC financials: ${(e as Error).message}`);
+    }
+  } else if (fi.ncua_charter) {
+    try {
+      const snapshot = await getNcuaFinancials(fi.ncua_charter);
+      if (snapshot.as_of_date) {
+        await supabase.from("fi_financials").insert({
+          fi_id: fi.id,
+          as_of_date: snapshot.as_of_date,
+          source: "ncua",
+          metrics: snapshot.metrics,
+          raw_payload: null,
+        });
+      }
+      // NCUA's per-CU detail endpoint returns city/state/website that the
+      // name-search endpoint doesn't, so backfill them on first ingest.
+      if (!fi.city || !fi.state || !fi.website) {
+        await supabase
+          .from("financial_institutions")
+          .update({
+            city: fi.city ?? snapshot.city,
+            state: fi.state ?? snapshot.state,
+            website: fi.website ?? snapshot.website,
+          })
+          .eq("id", fi.id);
+      }
+    } catch (e) {
+      errors.push(`NCUA financials: ${(e as Error).message}`);
     }
   }
 

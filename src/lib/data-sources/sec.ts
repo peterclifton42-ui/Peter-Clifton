@@ -62,6 +62,7 @@ export async function searchSecCompanies(
       state: null,
       fdic_cert: null,
       sec_cik: padCik(t.cik_str),
+      ncua_charter: null,
     }));
 }
 
