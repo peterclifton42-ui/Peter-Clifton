@@ -18,7 +18,8 @@ A private website that Curinos sellers log into with a normal username and passw
 | The `D` data object inside each dashboard | ~40 structured sections: `meta`, `basic`, `metrics`, `peers`, `nimTrend`, `funding`, `swot`, `curinosAngle`, `products`, `salesPlaybook`, `news`, `sources`… | **This is the most important thing.** Because the data is already separated from the layout, we can load it into a database and power search, comparison, aggregation and chat from it |
 | Run A / Run B pipeline | Scheduled tasks that research a bank, write an intel JSON, build the dashboard with `build_v2.py`, validate it, email it and publish it | The research engine already exists. It needs a new destination (the app's database) instead of email and an artifact |
 | Tier 3 Universe | 45 banks and 9 credit unions in the $20B–$75B band, plus exclusions | This is the coverage list (the app's "bank directory") |
-| Curinos Product Catalogue V3 | Product definitions, size gates, credit-union rules | This is the source for the product pages and product-fit scoring |
+| Curinos Product Catalogue **V4** (`reference/`) | ~37 products and Advisory engagements in 5 pillars, hard gates, a machine-readable product registry (K3), a fixed metric dictionary with severity bands (K4.1), strategy tags and timing themes (K4.2–K4.3), an FDIC peer benchmark (K10) | Already supplies most of the product pages, the peer-comparison metrics and the theme taxonomy (see section 5C) |
+| `build_v2.py` + `validate_updated_v2.py` (`reference/`) | Turns an intel JSON into the `D` object and wraps it in `SHELL_TOP.html` / `SHELL_BOTTOM.html` | Confirms the app only needs to store intel JSON; the page template is the two shell files |
 
 > **Key idea for a beginner:** today each dashboard is a *finished document* (a 500 KB file with the numbers baked in). An app needs *data plus a template*: the numbers live in a database, and one shared template draws any bank's page from them. That one change is what makes search, favourites, peer comparison, "what changed", cross-bank insights and the chatbot possible.
 
@@ -127,10 +128,14 @@ These are the gaps that will decide whether the app makes sense to a seller. Eac
 8. **Content licensing.** If you use paid data (e.g. S&P, BankRegData, BlastPoint), check whether it may be shown in an internal tool.
 
 ### C. Definitions that make comparison and aggregation honest
-9. **Metric dictionary.** For peer comparison every bank needs the *same* metrics, with the *same* definition, for the *same* quarter: NIM, cost of funds, loan-to-deposit (loan-to-share for credit unions), deposit mix, efficiency ratio, ROAA, CET1, and so on. Decide the list (~15–25 metrics) and how banks vs credit unions are shown (your catalogue already scores credit unions against NCUA system averages).
-10. **Theme taxonomy.** To say "18 banks cite deposit cost pressure", each bank's strategy, threats and opportunities must be tagged against a **fixed list of themes** (e.g. deposit pricing pressure, CRE exposure, M&A integration, digital transformation, fee income, data/analytics maturity, talent). Without a fixed list, aggregation is guesswork. *Draft ~20 themes; we refine them as data arrives.*
-11. **Product signals.** For each Curinos product: what evidence in a bank's data counts as a signal (a metric threshold, a quote, a strategic priority)? Your product-fit scoring already does this per bank. Product pages roll it up.
-12. **Opportunity rating.** HIGH / MEDIUM / LOW exists today; write down what each means so sellers trust it.
+*Update after reviewing Catalogue V4: most of this already exists.*
+
+9. **Metric dictionary — largely solved.** Catalogue K2/K4.1 already fixes ~20 metrics with exact definitions (deposit cost, NIM, NIB share, LDR, time-deposit share, wholesale share, AOCI/TCE, efficiency, deposits per branch…), each with peer arrays from the same quarter and severity bands. K10 adds an FDIC benchmark (p10–p90 across 133 US banks over $20B). **Still to define:** the credit-union equivalent of K10 (NCUA 5300 data), and which 6–8 of these metrics show by default on the Compare page.
+10. **Theme taxonomy — largely solved.** Every bank's `scoringInputs` already carries `statedPriorities` (≈45 tags in 11 families, K4.2) and dated `catalysts` on 12 timing themes (K4.3). Counting those across banks gives "18 of 54 banks are pricing a CD maturity wall in the next 6 months" mechanically. **Still to define:** a short list of *threat* themes (CRE exposure, M&A target risk, regulatory action…), which the catalogue doesn't cover because it's product-focused.
+11. **Product signals — solved.** Per-product gates, need metrics and timing themes are in the K3 registry, and every bank's product fit comes out of `score_v4.py`. Product pages = "all banks where this product is P1/P2, ranked by Fit, with the evidence".
+12. **Opportunity rating.** HIGH / MEDIUM / LOW exists today but isn't defined in the catalogue. Write down what each means (e.g. derived from the number and strength of P1 products) so sellers trust it.
+12a. **Product-page guardrails from the catalogue:** roadmap modules (Commit, Conserve, Calibrate) are always labelled "roadmap"; unlisted products (Profitability Optimizer, Lenders Optimizer, Commercial Digital Analyzer) say "availability to be confirmed"; only the verified proof points in Section CO may be quoted; credit unions get "member value" language. The app must enforce these, not just the research job.
+12b. **Catalogue upkeep.** V4 is dated 26 Sep 2026 and curinos.com changes (V3→V4 found 7 products gone and 5 new). Decide who re-checks it and how often (suggest monthly), and keep `score_v4.py` in step with it.
 
 ### D. Trust and quality
 13. **Human review.** Should a refreshed dashboard go live automatically, or wait for an admin to approve it? *Recommendation: auto-publish news; send full quarterly rebuilds to a quick review queue at first.*
@@ -204,6 +209,6 @@ These are the gaps that will decide whether the app makes sense to a seller. Eac
 3. Does Curinos use Microsoft 365 / Outlook sign-in for staff? (That decides SSO.)
 4. Should credit unions sit alongside banks everywhere, or in their own section?
 5. Which 5 metrics matter most to a seller when comparing peers?
-6. Do you have the Curinos product list handy (names + one-line descriptions) for the product pages?
+6. ~~Do you have the Curinos product list handy?~~ Done: Catalogue V4 is in `reference/`. Still needed from the project: `score_v4.py`, the newest `bank-benchmark-*.json`, `SHELL_TOP.html`, `SHELL_BOTTOM.html`, and `daily-dashboard-log.md` (the list of covered banks).
 7. Notifications: email, in-app only, or both? Instant, or a weekly digest?
 8. Should the Run A / Run B pipeline stay paused until it can write to the app?
