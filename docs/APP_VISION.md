@@ -19,7 +19,7 @@ A private website that Curinos sellers log into with a normal username and passw
 | Run A / Run B pipeline | Scheduled tasks that research a bank, write an intel JSON, build the dashboard with `build_v2.py`, validate it, email it and publish it | The research engine already exists. It needs a new destination (the app's database) instead of email and an artifact |
 | Tier 3 Universe | 45 banks and 9 credit unions in the $20B–$75B band, plus exclusions | This is the coverage list (the app's "bank directory") |
 | Curinos Product Catalogue **V4** (`reference/`) | ~37 products and Advisory engagements in 5 pillars, hard gates, a machine-readable product registry (K3), a fixed metric dictionary with severity bands (K4.1), strategy tags and timing themes (K4.2–K4.3), an FDIC peer benchmark (K10) | Already supplies most of the product pages, the peer-comparison metrics and the theme taxonomy (see section 5C) |
-| `build_v2.py` (`reference/`; the validator `validate_updated_v2.py` is in the Drive folder) | Turns an intel JSON into the `D` object and wraps it in `SHELL_TOP.html` / `SHELL_BOTTOM.html` | Confirms the app only needs to store intel JSON; the page template is the two shell files |
+| `build_v2.py`, `validate_updated_v2.py`, `score_v4.py`, `SHELL_TOP.html` / `SHELL_BOTTOM.html`, FDIC benchmark (`reference/`) | Turns an intel JSON into the `D` object and wraps it in `SHELL_TOP.html` / `SHELL_BOTTOM.html` | Confirms the app only needs to store intel JSON; the page template is the two shell files |
 
 > **Key idea for a beginner:** today each dashboard is a *finished document* (a 500 KB file with the numbers baked in). An app needs *data plus a template*: the numbers live in a database, and one shared template draws any bank's page from them. That one change is what makes search, favourites, peer comparison, "what changed", cross-bank insights and the chatbot possible.
 
@@ -209,6 +209,6 @@ These are the gaps that will decide whether the app makes sense to a seller. Eac
 3. Does Curinos use Microsoft 365 / Outlook sign-in for staff? (That decides SSO.)
 4. Should credit unions sit alongside banks everywhere, or in their own section?
 5. Which 5 metrics matter most to a seller when comparing peers?
-6. ~~Do you have the Curinos product list handy?~~ Done: Catalogue V4 is in `reference/`. Still needed from the project: `score_v4.py`, the newest `bank-benchmark-*.json`, `SHELL_TOP.html`, `SHELL_BOTTOM.html`, and `daily-dashboard-log.md` (the list of covered banks).
+6. ~~Do you have the Curinos product list handy?~~ Done: Catalogue V4 is in `reference/`. The build files, scorer, page templates and FDIC benchmark are now in `reference/` too.
 7. Notifications: email, in-app only, or both? Instant, or a weekly digest?
 8. Should the Run A / Run B pipeline stay paused until it can write to the app?
