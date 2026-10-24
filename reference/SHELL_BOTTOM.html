@@ -1,0 +1,1458 @@
+
+const productNameToIndex={};
+D.products.forEach((p,i)=>{productNameToIndex[p.name]=i});
+
+// ── UTILITY: Anchor navigation bar ──────────────────────────────────────────
+function anav(links){
+  return `<div class="anav"><span class="anav-label">Jump to</span>${links.map(([label,id])=>`<button class="anav-btn" onclick="document.getElementById('${id}').scrollIntoView({behavior:'smooth',block:'start'})">${label}</button>`).join('')}</div>`;
+}
+
+function jumpToProduct(productName){
+  tab="Product Fit & Playbook";
+  rt();rc();
+  setTimeout(()=>{
+    const idx=productNameToIndex[productName];
+    if(idx===undefined)return;
+    toggleProduct(idx,true);
+    const el=document.getElementById(`prod-${idx}`);
+    if(!el)return;
+    setTimeout(()=>{el.scrollIntoView({behavior:'smooth',block:'start'});el.classList.add('highlighted');setTimeout(()=>el.classList.remove('highlighted'),2500);},80);
+  },50);
+}
+
+function toggleProduct(idx,forceOpen){
+  const body=document.getElementById(`body-${idx}`);
+  const expand=document.getElementById(`expand-${idx}`);
+  if(!body||!expand)return;
+  if(forceOpen||!body.classList.contains("open")){body.classList.add("open");expand.classList.add("open");expandedProducts.add(idx);}
+  else{body.classList.remove("open");expand.classList.remove("open");expandedProducts.delete(idx);}
+}
+
+function rt(){
+  const b=document.getElementById("tabBar");b.innerHTML="";
+  TABS.forEach(t=>{const e=document.createElement("div");e.className="tab"+(t===tab?" active":"");e.textContent=t;e.onclick=()=>{tab=t;rt();rc()};b.appendChild(e);});
+}
+
+function initBankBar(){
+  const nameEl=document.getElementById("bankName");
+  const metaEl=document.getElementById("bankMeta");
+  const oppEl=document.getElementById("oppBadge");
+  if(nameEl)nameEl.textContent=D.basic.name;
+  if(metaEl){
+    const parts=[];
+    if(D.basic.ticker&&D.basic.ticker!=="N/A"&&D.basic.ticker!=="N/A (Private)"&&D.basic.ticker!=="N/A (Credit Union)")parts.push(D.basic.ticker);
+    if(D.basic.fdic&&D.basic.fdic!=="N/A")parts.push("FDIC #"+D.basic.fdic);
+    if(D.basic.hq)parts.push(D.basic.hq.split(",").slice(-2).join(",").trim());
+    metaEl.textContent=parts.join(" · ");
+  }
+  if(oppEl&&D.meta&&D.meta.opportunity){
+    const opp=D.meta.opportunity.toUpperCase();
+    oppEl.textContent=opp+" OPPORTUNITY";
+    oppEl.className="ob "+(opp==="HIGH"?"oh":opp==="MEDIUM"?"om":"ol");
+  }
+  document.title="Curinos Sales Intelligence -- "+D.basic.name;
+}
+
+function tp(t,id){
+  if(!t)return "";
+  const oc={high:"oh",medium:"om",low:"ol"}[t.o]||"ol";
+  const ol={high:"HIGH",medium:"MEDIUM",low:"LOW"}[t.o]||"";
+  const ps=(t.p||[]).map(p=>`<div class="ttp-item" onclick="jumpToProduct('${p}')" style="margin-bottom:4px">- ${p}</div>`).join("");
+  let srcHtml="";
+  if(t.src&&t.src.length){
+    srcHtml=`<div class="ttp-cite" style="margin-top:8px;padding-top:6px;border-top:1px solid #334155"><span style="font-size:9px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Sources</span>${t.src.map(s=>`<span onclick="window.open('${s.u}','_blank')" style="display:block;color:#60a5fa;cursor:pointer;text-decoration:underline;font-size:10px;margin-top:4px">${s.n} ↗</span>`).join("")}</div>`;
+  } else if(t.cite){
+    srcHtml=`<div class="ttp-cite" style="margin-top:8px;padding-top:6px;border-top:1px solid #334155"><span style="font-size:10px;color:#64748b"> Sources: ${t.cite}</span></div>`;
+  }
+  return`<button class="tip-btn" onclick="tt('${id}')">i</button><div class="ttp" id="${id}"><div class="ttl">${t.metric||""}</div><div class="tts"> What it means</div><div class="ttx">${t.m||""}</div><div class="tts"> Sales insight</div><div class="ttx">${t.sa||""}</div>${t.o?`<span class="tto ${oc}">${ol} OPPORTUNITY</span>`:""}${ps?`<div class="tts" style="margin-top:8px">Relevant Curinos products (click to view)</div>${ps}`:""}${srcHtml}</div>`;
+}
+
+function tt(id){
+  document.querySelectorAll(".ttp").forEach(e=>{if(e.id!==id)e.classList.remove("show")});
+  const el=document.getElementById(id);if(!el)return;
+  const wasShown=el.classList.contains("show");el.classList.remove("show");if(wasShown)return;
+  el.classList.add("show");
+  const vw=window.innerWidth,vh=window.innerHeight;
+  if(vw<=768){el.style.left='';el.style.top='';el.style.bottom='';return;}
+  const TW=320,PAD=10;
+  const anchorEl=document.querySelector(`[onclick="tt('${id}')"]`);
+  if(!anchorEl){el.style.top="60px";el.style.left="20px";return;}
+  const r=anchorEl.getBoundingClientRect();const tH=el.offsetHeight||420;
+  let left,top;
+  if(r.right+TW+PAD<=vw)left=r.right+PAD;
+  else if(r.left-TW-PAD>=0)left=r.left-TW-PAD;
+  else left=Math.max(PAD,Math.min(r.left,vw-TW-PAD));
+  top=r.top;if(top+tH>vh-PAD)top=Math.max(PAD,vh-tH-PAD);if(top<PAD)top=PAD;
+  el.style.left=left+"px";el.style.top=top+"px";el.style.bottom='';
+}
+
+document.addEventListener("click",e=>{
+  if(!e.target.classList.contains("tip-btn")&&!e.target.closest(".ttp")){
+    document.querySelectorAll(".ttp").forEach(el=>el.classList.remove("show"));
+  }
+});
+
+function mcard(m){
+  const id="t"+(mid++);
+  const trRaw=m.tr||"";
+  const trText=trRaw?(trRaw.startsWith('▲')||trRaw.startsWith('▼')?trRaw:(m.tu?'▲ ':'▼ ')+trRaw):"";
+  return`<div class="mc"><div class="ml">${m.l}<span style="position:relative">${tp({...m.t,metric:m.l},id)}</span></div><div class="mv">${m.v}</div>${m.s?`<div class="ms">${m.s}</div>`:""}${trText?`<div class="mt ${m.tu?"tu":"td"}">${trText}</div>`:""}</div>`;
+}
+
+function rc(){
+  Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={};mid=0;
+  const el=document.getElementById("mc");
+  const map={
+    "Financial Overview":finOv,
+    "Organisation & People":orgPeople,
+    "Balance Sheet & Funding":loansProd,
+    "Strategy & Health":stratHealth,
+    "Analytics & Technology":analyticsTech,
+    "Peer Comparison":peer,
+    "Product Fit & Playbook":productPlaybook,
+    "Recent News":news
+  };
+  el.innerHTML=(map[tab]||finOv)();
+  if(tab==="Financial Overview")setTimeout(()=>setupFinCharts(),0);
+  if(tab==="Balance Sheet & Funding")setTimeout(()=>setupLoanCharts(),0);
+  if(tab==="Peer Comparison")setTimeout(()=>setupPeerCharts(),0);
+}
+
+// ── TAB 1: FINANCIAL OVERVIEW ─────────────────────────────────────────────
+function finOv(){
+  const fo=D.finOverview||{};
+  // Tooltip source links: prefer the panel's own src[] ({n,u}); fall back to
+  // the top-level D.sources[] ({label,url}) so a "Sources" heading is never
+  // left standing with nothing under it.
+  const srcLinkList=arr=>((arr&&arr.length?arr:(D.sources||[])).map(s=>`<span onclick="window.open('${s.u||s.url||''}','_blank')" style="display:block;color:#60a5fa;cursor:pointer;text-decoration:underline;font-size:10px;margin-top:4px">${s.n||s.label||''} ↗</span>`).join(''));
+  const theme=fo.salesTheme||("Primary Opportunity: "+D.basic.name);
+  const themeBody=fo.salesThemeBody||"";
+  const bsTrend=fo.balanceSheetTrend||"";
+  const revTrend=fo.revenueTrend||"";
+  const details=(fo.keyDetails||[]).map(d=>`<div style="display:flex;justify-content:space-between;margin-bottom:8px"><span>${d.label}</span><span style="color:${d.highlight?"#34d399":"#fff"};font-weight:700">${d.value}</span></div>`).join("");
+  const alert=fo.alert||"";const alertBody=fo.alertBody||"";
+
+  // NII Sensitivity panel  from D.finOverview.niiSensitivity
+  const nii=fo.niiSensitivity||{};
+  let niiPanel="";
+  if(nii.upBps||nii.downBps){
+    const upLabel=nii.upLabel||("Per +"+(nii.upBps||25)+"bps Fed move");
+    const downLabel=nii.downLabel||("Per -"+(nii.downBps||25)+"bps Fed move");
+    const upColor=nii.upPositive!==false?"#34d399":"#f87171";
+    const downColor=nii.downPositive===true?"#34d399":"#f87171";
+    const betaItems=(nii.betaMetrics||[]).map(bm=>`<div style="text-align:center;padding:12px 8px;background:#0f172a;border-radius:8px;border:1px solid #334155"><div style="font-size:10px;color:#64748b;margin-bottom:6px">${bm.label}</div><div style="font-size:22px;font-weight:700;color:${bm.colour||"#60a5fa"}">${bm.value}</div><div style="font-size:9px;color:#475569;margin-top:4px;line-height:1.4">${bm.note||""}</div></div>`).join("");
+    const betaGrid=nii.betaMetrics&&nii.betaMetrics.length?`<div style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Deposit Beta &amp; Cost Metrics</div><div style="display:grid;grid-template-columns:repeat(${nii.betaMetrics.length},1fr);gap:8px">${betaItems}</div>`:"";
+    const salesAngle=nii.salesAngle?`<div style="background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.2);border-radius:8px;padding:12px;margin-top:auto"><div style="font-size:10px;font-weight:700;color:#34d399;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px"> Curinos Sales Angle</div><div style="font-size:11px;color:#94a3b8;line-height:1.7">${nii.salesAngle}</div></div>`:""
+    niiPanel=`<div class="panel" style="margin-bottom:0;display:flex;flex-direction:column;gap:16px"><h3 style="margin:0">NII Sensitivity &amp; Deposit Beta <button class="tip-btn" onclick="tt('ttp-nii-sh')">i</button></h3><div class="ttp" id="ttp-nii-sh"><div class="ttl">NII Sensitivity Sources</div><div class="ttx">${fo.niiSensitivity&&fo.niiSensitivity.salesAngle?fo.niiSensitivity.salesAngle:''}</div>${srcLinkList(fo.niiSensitivity&&fo.niiSensitivity.src)}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div style="background:#0f172a;border-radius:8px;padding:14px;border:1px solid #334155;border-left:3px solid ${upColor}"><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">${upLabel}</div><div style="font-size:28px;font-weight:700;color:${upColor};line-height:1">${nii.upValue||"+TBD"}</div><div style="font-size:11px;color:#64748b;margin-top:6px">Annual NII benefit</div></div><div style="background:#0f172a;border-radius:8px;padding:14px;border:1px solid #334155;border-left:3px solid ${downColor}"><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">${downLabel}</div><div style="font-size:28px;font-weight:700;color:${downColor};line-height:1">${nii.downValue||"-TBD"}</div><div style="font-size:11px;color:#64748b;margin-top:6px">Annual NII headwind</div></div></div>${betaGrid}${salesAngle}</div>`;
+  }
+
+  // Analyst consensus panel  compact KPI boxes matching reference design
+  // Fields: mgmtGuidance (+5-7%), mgmtLabel, streetConsensus (+4-6%), streetLabel,
+  //         confidenceNote, confidenceLevel, confidenceTitle, stockBadge{},
+  //         capitalBadge{}, salesRead, src[]
+  const ac=fo.analystConsensus||{};
+  let analystPanel="";
+  if(ac.mgmtGuidance||ac.streetConsensus){
+    const confLevel=(ac.confidenceLevel||"AMBER").toUpperCase();
+    const confColour={AMBER:"#fbbf24",GREEN:"#34d399",RED:"#f87171"}[confLevel]||"#fbbf24";
+    const confBg={AMBER:"rgba(245,158,11,0.07)",GREEN:"rgba(16,185,129,0.07)",RED:"rgba(248,113,113,0.07)"}[confLevel]||"rgba(245,158,11,0.07)";
+    const confBorder={AMBER:"rgba(245,158,11,0.25)",GREEN:"rgba(16,185,129,0.25)",RED:"rgba(248,113,113,0.25)"}[confLevel]||"rgba(245,158,11,0.25)";
+    const acTipId="ttp-ac-"+(mid);
+    const acTip=`<button class="tip-btn" onclick="tt('${acTipId}')">i</button><div class="ttp" id="${acTipId}"><div class="ttl">Analyst Consensus Sources</div><div class="ttx">${ac.streetConsensus||""}</div>${srcLinkList(ac.src)}</div>`;mid++;
+    const stockHtml=ac.stockBadge?`<div style="background:#0f172a;border-radius:8px;padding:12px;border:1px solid #334155"><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">${ac.stockBadge.label||"Stock vs. Index"}</div><div style="display:flex;gap:12px;align-items:baseline"><div><div style="font-size:20px;font-weight:700;color:#34d399">${ac.stockBadge.value||""}</div><div style="font-size:9px;color:#64748b">${ac.stockBadge.ticker||""}</div></div>${ac.stockBadge.vsValue?`<div style="font-size:11px;color:#475569">vs</div><div><div style="font-size:20px;font-weight:700;color:#64748b">${ac.stockBadge.vsValue}</div><div style="font-size:9px;color:#64748b">${ac.stockBadge.vsLabel||""}</div></div>`:""}</div>${ac.stockBadge.sub?`<div style="font-size:10px;color:#64748b;margin-top:6px">${ac.stockBadge.sub}</div>`:""}</div>`:"";
+    const capHtml=ac.capitalBadge?`<div style="background:#0f172a;border-radius:8px;padding:12px;border:1px solid #334155"><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">${ac.capitalBadge.label||"Capital Return"}</div><div style="font-size:20px;font-weight:700;color:#34d399">${ac.capitalBadge.value||""}</div>${ac.capitalBadge.sub?`<div style="font-size:10px;color:#64748b;margin-top:4px">${ac.capitalBadge.sub}</div>`:""}<div style="font-size:10px;font-weight:700;color:#34d399;margin-top:6px">${ac.capitalBadge.signal||""}</div></div>`:"";
+    const salesReadHtml=ac.salesRead?`<div style="background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.2);border-radius:8px;padding:12px"><div style="font-size:10px;font-weight:700;color:#60a5fa;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">📋 SALES READ</div><div style="font-size:11px;color:#94a3b8;line-height:1.6">${ac.salesRead}</div></div>`:"";
+    analystPanel=`<div class="panel" style="margin-bottom:0;display:flex;flex-direction:column;gap:14px"><h3 style="margin:0">Analyst Consensus &amp; Investment Signals ${acTip}</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div style="background:#0f172a;border-radius:8px;padding:14px;border:1px solid #334155;border-left:3px solid #34d399"><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Management Guidance</div><div style="font-size:28px;font-weight:700;color:#34d399;line-height:1">${ac.mgmtGuidance||"--"}</div><div style="font-size:11px;color:#64748b;margin-top:6px">${ac.mgmtLabel||""}</div></div><div style="background:#0f172a;border-radius:8px;padding:14px;border:1px solid #334155;border-left:3px solid #f59e0b"><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Street Consensus</div><div style="font-size:28px;font-weight:700;color:#f59e0b;line-height:1">${ac.streetConsensus||"--"}</div><div style="font-size:11px;color:#64748b;margin-top:6px">${ac.streetLabel||""}</div></div></div>${ac.confidenceNote?`<div style="background:${confBg};border:1px solid ${confBorder};border-radius:8px;padding:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-size:11px;font-weight:700;color:#94a3b8">${ac.confidenceTitle||"Guidance Confidence"}</span><span style="font-size:10px;padding:2px 10px;border-radius:10px;font-weight:700;background:rgba(245,158,11,0.15);border:1px solid ${confBorder};color:${confColour}">${confLevel}</span></div><div style="font-size:11px;color:#94a3b8;line-height:1.6">${ac.confidenceNote}</div></div>`:""}${stockHtml||capHtml?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${stockHtml}${capHtml}</div>`:""}${salesReadHtml}</div>`;
+  }
+
+  // Fee income breakdown panel  from D.finOverview.feeIncome
+  const fi=fo.feeIncome||{};
+  let feePanel="";
+  if(fi.items&&fi.items.length){
+    const feeItems=fi.items.map(f=>`<div style="border-left:3px solid ${f.colour||"#60a5fa"};padding:10px 12px;background:rgba(15,23,42,0.5);border-radius:0 6px 6px 0;margin-bottom:10px">
+<div style="display:flex;justify-content:space-between;align-items:flex-start">
+  <div style="flex:1">
+    <div style="font-size:12px;font-weight:700;color:#fff">${f.label}</div>
+    ${f.note?`<div style="font-size:10px;color:#64748b;margin-top:2px">${f.note}</div>`:""}
+    ${f.product?`<div style="font-size:10px;color:${f.colour||"#60a5fa"};font-weight:600;margin-top:4px">→ ${f.product}</div>`:""}
+    ${f.angle?`<div style="font-size:10px;color:#64748b;line-height:1.4;margin-top:3px">${f.angle}</div>`:""}
+  </div>
+  <div style="text-align:right;flex-shrink:0;margin-left:12px">
+    <div style="font-size:16px;font-weight:700;color:${f.colour||"#60a5fa"}">${f.value}</div>
+    ${f.trend?`<div style="font-size:10px;color:#64748b">${f.trend}</div>`:""}
+  </div>
+</div>
+</div>`).join("");
+    feePanel=`<div class="panel"><h3>Fee Income Breakdown &amp; Curinos Product Timing <button class="tip-btn" onclick="tt('ttp-fees-sh')">i</button></h3><div class="ttp" id="ttp-fees-sh"><div class="ttl">Fee Income Sources</div><div class="ttx">${fo.feeIncome&&fo.feeIncome.salesAngle?fo.feeIncome.salesAngle:''}</div>${srcLinkList(fo.feeIncome&&fo.feeIncome.src)}</div><div id="fo-fees" class="section-anchor"></div>${fi.intro?`<p style="font-size:12px;color:#64748b;margin-bottom:12px">${fi.intro}</p>`:""}<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${feeItems}</div>${fi.salesAngle?`<div style="background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.2);border-radius:8px;padding:10px;margin-top:12px"><div style="font-size:10px;font-weight:700;color:#60a5fa;margin-bottom:4px">🎯 Curinos Timing Signal</div><div style="font-size:11px;color:#94a3b8;line-height:1.6">${fi.salesAngle}</div></div>`:""}</div>`;
+  }
+
+  const niiAnalystRow=(niiPanel||analystPanel)?`<div id="fo-nii" class="section-anchor" style="margin-top:8px"></div><div class="g2" style="margin-bottom:16px;align-items:stretch">${niiPanel||""}${analystPanel||""}</div>`:"";
+
+  return anav([['Key Metrics','fo-metrics'],['NII Intelligence','fo-nii'],['Fee Income','fo-fees'],['Sales Theme','fo-theme'],['Trend Charts','fo-charts'],['Sales Strategy','fo-strategy']]) +
+  `<div id="fo-metrics" class="section-anchor"></div>
+<div class="g4">${D.metrics.slice(0,4).map(m=>mcard(m)).join("")}</div>
+<div class="g4">${D.metrics.slice(4,8).map(m=>mcard(m)).join("")}</div>
+${D.metrics.length>8?`<div class="g4">${D.metrics.slice(8,12).map(m=>mcard(m)).join("")}</div>`:""}` +
+  niiAnalystRow +
+  feePanel +
+  `<div id="fo-theme" class="section-anchor"></div>
+<div class="ib ib-g"><div class="ibt">${theme}</div><p>${themeBody}</p></div>
+<div id="fo-charts" class="section-anchor"></div>
+<div class="g2" style="margin-top:16px">
+<div class="panel" style="margin-bottom:0"><h3>Balance Sheet Trend <button class="tip-btn" onclick="tt('ttp-bs-sh')">i</button></h3><div class="ttp" id="ttp-bs-sh"><div class="ttl">Balance Sheet Data Sources</div><div class="ttx">${fo.balanceSheetSource||'Quarterly balance sheet data from institution earnings releases and FDIC filings.'}</div>${(D.sources||[]).map(s=>`<span onclick="window.open('${s.url||''}','_blank')" style="display:block;color:#60a5fa;cursor:pointer;text-decoration:underline;font-size:10px;margin-top:4px">${s.label||''} ↗</span>`).join('')}</div>
+<div class="chart-container"><canvas id="balanceChart"></canvas></div>
+${bsTrend?`<div style="margin-top:12px;font-size:11px;color:#94a3b8;line-height:1.6"><strong style="color:#60a5fa"> Trend Analysis:</strong> ${bsTrend}</div>`:""}
+</div>
+<div class="panel" style="margin-bottom:0"><h3>Revenue Trend <button class="tip-btn" onclick="tt('ttp-rev-sh')">i</button></h3><div class="ttp" id="ttp-rev-sh"><div class="ttl">Revenue Data Sources</div><div class="ttx">${fo.revenueSource||'Quarterly NII and non-interest income from institution earnings releases.'}</div>${(D.sources||[]).map(s=>`<span onclick="window.open('${s.url||''}','_blank')" style="display:block;color:#60a5fa;cursor:pointer;text-decoration:underline;font-size:10px;margin-top:4px">${s.label||''} ↗</span>`).join('')}</div>
+<div class="chart-container"><canvas id="revenueChart"></canvas></div>
+${revTrend?`<div style="margin-top:12px;font-size:11px;color:#94a3b8;line-height:1.6"><strong style="color:#60a5fa"> Trend Analysis:</strong> ${revTrend}</div>`:""}
+</div></div>
+${details?`<div class="panel"><h3>Key Financial Metrics -- ${D.meta&&D.meta.latestQuarter?D.meta.latestQuarter:"Latest Quarter"} Detail</h3><div style="font-size:13px;color:#94a3b8;line-height:2">${details}</div></div>`:""}
+${alert?`<div class="ib ib-a" style="margin-top:16px"><div class="ibt">${alert}</div><p>${alertBody}</p></div>`:""}
+<div class="panel" style="margin-top:16px;background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.3)">
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+<div><div style="font-size:12px;font-weight:700;color:#60a5fa;margin-bottom:4px"> Live ROI Calculator Available</div><div style="font-size:11px;color:#94a3b8">Show the client their dollar value in real-time. Adjustable deposit base and improvement assumption.</div></div>
+<button onclick="tab='Product Fit &amp; Playbook';rt();rc();setTimeout(()=>{document.getElementById('pp-calc')?.scrollIntoView({behavior:'smooth',block:'start'})},80)" style="background:#1e40af;border:1px solid #3b82f6;color:#e2e8f0;padding:8px 18px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">Open ROI Calculator →</button>
+</div></div>` +
+
+  '';
+}
+
+// ── TAB 2: ORGANISATION & PEOPLE ──────────────────────────────────────────
+function orgPeople(){
+  // entProfile() = Bank Size Classification + Demographics (op-overview + op-market)
+  // entStructure() = Corporate Entity Structure (op-structure) - shown AFTER leadership
+  const entFull=ent();
+  // Split ent() output: profile = everything before op-market anchor going into structure
+  // structure = the Corporate Entity Structure panel
+  const structMarker='<div class="panel"><h3>Corporate Entity Structure';
+  const marketMarker='<div id="op-market"';
+  const structIdx=entFull.indexOf(structMarker);
+  const marketIdx=entFull.indexOf(marketMarker);
+  // Profile section = bank size + the op-structure anchor header + entity structure + demographics
+  // We want: [bank size + demographics] first, [entity structure] after contacts
+  let profileHtml=entFull; // fallback: render all of ent() in overview
+  let structureHtml='';
+  if(structIdx>=0&&marketIdx>=0){
+    // Everything BEFORE the structure panel = bank size classification
+    const beforeStructure=entFull.slice(0,structIdx);
+    // The structure panel itself
+    const afterStructure=entFull.slice(structIdx,marketIdx);
+    structureHtml=afterStructure;
+    // Profile = before structure + from op-market onwards
+    profileHtml=beforeStructure+entFull.slice(marketIdx);
+  }
+
+  return anav([['Bank Profile','op-overview'],['Executive Leadership','op-leadership'],['Corporate Structure','op-structure'],['Curinos Targets','op-targets'],['Silo Assessment','op-silo']]) +
+  '<div id="op-overview" class="section-anchor"></div>' +
+  profileHtml +
+  '<div id="op-leadership" class="section-anchor" style="margin-top:8px"></div>' +
+  contacts() +
+  '<div id="op-structure" class="section-anchor" style="margin-top:8px"></div>' +
+  structureHtml +
+  '<div id="op-silo" class="section-anchor" style="margin-top:8px"></div>' +
+  siloAssessment();
+}
+
+function ent(){
+  const {parent,intermediate,bank,subs,regulators}=D.structure;
+  const {assets,branches,states,atms,markets,employees,rank,segments}=D.demo;
+  const band=D.meta&&D.meta.sizeBand?D.meta.sizeBand:"";
+  const intermediateBlock=intermediate?`<div class="tree-line"></div><div class="org-box" style="background:#7c3aed;border-color:#8b5cf6"><div class="org-title">Intermediate Holding Company</div><div class="org-name" style="font-size:14px">${intermediate.name}</div><div class="org-detail">${intermediate.type}</div><div class="org-detail">${intermediate.purpose}</div></div>`:`<div class="tree-line"></div>`;
+  const subRows=(subs&&subs.length)?`<div class="tree-line"></div><div class="tree-branch"></div><div class="g3" style="margin-top:20px">${subs.slice(0,3).map(s=>`<div class="org-box" style="background:#334155"><div class="org-title">Subsidiary</div><div class="org-name" style="font-size:12px">${s.name}</div><div class="org-detail">${s.type}</div></div>`).join("")}</div>${subs.length>3?`<div class="g2">${subs.slice(3).map(s=>`<div class="org-box" style="background:#334155"><div class="org-title">Subsidiary</div><div class="org-name" style="font-size:12px">${s.name}</div><div class="org-detail">${s.type}</div></div>`).join("")}</div>`:""}`:"";
+  return`<div class="panel"><h3>Bank Size Classification</h3><div style="text-align:center;padding:20px"><span style="display:inline-block;padding:8px 20px;border-radius:8px;font-size:13px;font-weight:700;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.4);color:#60a5fa">${band}</span><div style="font-size:12px;color:#64748b;margin-top:8px;font-weight:600">${rank||""}</div><div style="font-size:11px;color:#94a3b8;margin-top:6px">${D.demo.digital||""}</div></div></div>
+<div class="panel"><h3>Corporate Entity Structure <button class="tip-btn" onclick="tt('ttp-entity')">i</button></h3><div class="ttp" id="ttp-entity"><div class="ttl">Entity Structure Sources</div><div class="ttx">Corporate entity structure sourced from FDIC BankFind, institution 10-K filings, and Federal Reserve supervision data.</div><div class="ttp-cite" style="margin-top:8px;padding-top:6px;border-top:1px solid #334155"><span style="font-size:9px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Sources</span>${(D.sources||[]).map(s=>`<span onclick="window.open('${s.url||''}','_blank')" style="display:block;color:#60a5fa;cursor:pointer;text-decoration:underline;font-size:10px;margin-top:4px">${s.label||''} ↗</span>`).join('')||'<span onclick="window.open(\'https://banks.data.fdic.gov/bankfind-suite/bankfind\',\'_blank\')" style="display:block;color:#60a5fa;cursor:pointer;text-decoration:underline;font-size:10px;margin-top:4px">FDIC BankFind Suite ↗</span>'}</div></div><div style="text-align:center;max-width:800px;margin:0 auto">
+<div class="org-box" style="background:#2563eb;border-color:#3b82f6"><div class="org-title">Public Parent Company${parent.nasdaq&&parent.nasdaq!=="N/A"?" ("+parent.nasdaq+")":""}</div><div class="org-name" style="font-size:15px">${parent.name}</div><div class="org-detail">${parent.type} · ${parent.regulator}</div>${parent.rssd?`<div class="org-detail">RSSD: ${parent.rssd}</div>`:""}</div>
+${intermediateBlock}
+<div class="org-box" style="background:#059669;border-color:#10b981"><div class="org-title">Operating Bank (FDIC Insured)</div><div class="org-name" style="font-size:15px">${bank.name}</div><div class="org-detail">${bank.type}${bank.fdic?" · FDIC #"+bank.fdic:""}</div><div class="org-detail">Regulators: ${bank.regulator} · ${bank.charter} Charter</div></div>
+${subRows}</div></div>
+<div class="g2">
+<div class="panel"><h3>Key Subsidiaries Detail</h3>${(subs||[]).map(s=>`<div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #334155"><p style="font-size:13px;font-weight:700;color:#60a5fa;margin-bottom:4px">${s.name}</p><p style="font-size:12px;color:#94a3b8;margin-bottom:2px"><strong>Type:</strong> ${s.type}</p>${s.aum?`<p style="font-size:12px;color:#94a3b8;margin-bottom:2px"><strong>AUM/AUA:</strong> ${s.aum}</p>`:""}<p style="font-size:12px;color:#94a3b8"><strong>Purpose:</strong> ${s.purpose||""}</p></div>`).join("")}</div>
+<div class="panel" style="margin-bottom:0"><h3>Regulatory Authorities</h3><div style="font-size:12px;color:#94a3b8;line-height:2">${(regulators||[]).map(r=>`<div style="margin-bottom:8px">- <strong style="color:#fff">${r.split("(")[0]}</strong>${r.includes("(")?` -- ${r.match(/\(([^)]+)\)/)[1]}`:""}</div>`).join("")}</div></div>
+</div>
+${(()=>{
+  const segs=D.businessSegments||[];
+  if(!segs.length) return '';
+  const par=D.structure&&D.structure.parent||{};
+  const parName=par.name||D.basic.name||'';
+  const parNasdaq=par.nasdaq&&par.nasdaq!=='N/A'?` (NYSE: ${par.nasdaq})`:'';
+  const parRank=D.demo&&D.demo.rank?D.demo.rank:'';
+  const parAssets=D.demo&&D.demo.assets?D.demo.assets:'';
+  const parFortune=D.demo&&D.demo.fortune?D.demo.fortune:'';
+  const parSubtitle=[parRank,parAssets,parFortune].filter(Boolean).join(' · ');
+  const _execs=(D.contacts&&D.contacts.execs)||[];
+  const ceo=_execs.find(c=>c.title&&c.title.toLowerCase().includes('ceo'));
+  const cfo=_execs.find(c=>c.title&&c.title.toLowerCase().includes('cfo'));
+  const leaderLine=[ceo?`CEO: ${ceo.name}`:'',cfo?`CFO: ${cfo.name}`:''].filter(Boolean).join(' · ');
+  const segCards=segs.map(s=>`<div style="background:#0f172a;border:1px solid #1e293b;border-left:3px solid ${s.colour||'#60a5fa'};border-radius:8px;padding:14px">
+<div style="font-size:13px;font-weight:700;color:${s.colour||'#60a5fa'};margin-bottom:4px">${s.name||''}</div>
+<div style="font-size:11px;font-weight:600;color:#cbd5e1;margin-bottom:4px">Head: ${s.head||''}</div>
+<div style="font-size:10px;color:#64748b;margin-bottom:5px">${s.stat||''}</div>
+<div style="font-size:10px;color:#475569;line-height:1.5">${s.products||''}</div>
+</div>`).join('');
+  return`<div class="panel" style="margin-top:8px"><h3>Corporate Structure — ${parName}</h3>
+<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:16px;margin-bottom:12px;text-align:center">
+<div style="font-size:15px;font-weight:700;color:#60a5fa">${parName}${parNasdaq}</div>
+${parSubtitle?`<div style="font-size:11px;color:#64748b;margin-top:4px">${parSubtitle}</div>`:''}
+${leaderLine?`<div style="font-size:11px;color:#94a3b8;margin-top:4px">${leaderLine}</div>`:''}
+</div>
+<div class="g2">${segCards}</div>
+</div>`;
+})()}
+<div id="op-market" class="section-anchor"></div>
+<div class="panel"><h3>Bank Demographics &amp; Market Presence</h3><div class="g3"><div><div class="mv" style="color:#60a5fa;font-size:28px">${branches||"--"}</div><div class="ms">Branches${states?" across "+states:""}</div>${atms?`<div class="ms" style="margin-top:6px">${atms} ATMs</div>`:""}</div><div><div class="mv" style="color:#34d399;font-size:28px">${employees||"--"}</div><div class="ms">Total employees</div>${rank?`<div class="ms" style="margin-top:6px">${rank}</div>`:""}</div><div><div class="mv" style="color:#fbbf24;font-size:${(assets||"").length>8?"20px":"28px"}">${(assets||"--").replace(/\s*\(.*\)/,"")}</div><div class="ms">Total Assets</div>${assets&&assets.includes("(")?`<div class="ms" style="margin-top:2px">${assets.match(/\(([^)]+)\)/)?.[1]||""}</div>`:""}</div></div>${markets&&markets.length?`<div style="margin-top:20px"><div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:10px">Markets (${markets.length})</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">${markets.map(m=>`<div style="font-size:12px;color:#94a3b8">- ${m}</div>`).join("")}</div></div>`:""}${segments&&segments.length?`<div style="margin-top:20px"><div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:10px">Business Segments</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${segments.map(s=>`<div style="font-size:12px;color:#94a3b8">- ${s}</div>`).join("")}</div></div>`:""}</div>`;
+}
+
+function contacts(){
+  const ct=D.contacts||{};
+  // Support both rich exec objects (D.contacts.execs[]) and simple primary/functional arrays
+  const execs=ct.execs||[];
+  const primary=ct.primary||[];
+  const functional=ct.functional||[];
+
+  let execHtml="";
+  if(execs.length){
+    // Rich format: each exec has name, title, relevance, products, insight, col, badge
+    execHtml=`<div class="panel"><h3>Executive Leadership -- Direct Decision-Makers</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">
+    ${execs.map(ex=>`<div style="background:#0f172a;border:1px solid #1e293b;border-top:3px solid ${ex.col||"#60a5fa"};border-radius:10px;padding:16px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <div><div style="font-size:14px;font-weight:700;color:#fff">${ex.name}</div><div style="font-size:11px;color:#64748b;margin-top:3px">${ex.title}</div>${ex.since?`<div style="font-size:10px;color:#475569;margin-top:2px">${ex.since}</div>`:""}</div>
+        ${ex.badge?`<span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:6px;background:rgba(100,116,139,0.2);color:#94a3b8;white-space:nowrap;flex-shrink:0;margin-left:8px">${ex.badge}</span>`:""}
+      </div>
+      ${ex.relevance?`<div style="font-size:11px;color:#94a3b8;line-height:1.55;margin-bottom:10px">${ex.relevance}</div>`:""}
+      ${ex.insight?`<div style="background:rgba(59,130,246,0.08);border-left:2px solid ${ex.col||"#60a5fa"};padding:8px 10px;border-radius:4px;margin-bottom:8px"><div style="font-size:10px;font-weight:700;color:${ex.col||"#60a5fa"};text-transform:uppercase;margin-bottom:3px">Curinos Insight</div><div style="font-size:10px;color:#94a3b8;line-height:1.5">${ex.insight}</div></div>`:""}
+      ${ex.products?`<div style="font-size:9px;color:#64748b;margin-top:6px"> Products: <span style="color:#a78bfa">${ex.products}</span></div>`:""}
+    </div>`).join("")}
+    </div></div>`;
+  } else if(primary.length||functional.length){
+    // Simple format
+    const primHtml=primary.map(p=>`<div style="margin-bottom:6px"><strong style="color:#fff">${p.name}</strong> -- ${p.title}<br><span style="font-size:11px;color:#94a3b8">${p.note||""}</span></div>`).join("");
+    const funcHtml=functional.map(p=>`<div style="margin-bottom:4px">- <strong style="color:#fff">${p.name||p.title}</strong>${p.title&&p.name?" -- "+p.title:""}${p.product?" ("+p.product+")":""}</div>`).join("");
+    execHtml=`<div class="panel"><h3>Key Contacts for Curinos Sales Engagement</h3>
+    ${primHtml?`<div style="background:rgba(59,130,246,0.08);border-left:3px solid #60a5fa;padding:14px;border-radius:8px;margin-bottom:12px"><div style="font-size:12px;font-weight:700;color:#60a5fa;margin-bottom:8px">PRIMARY DECISION MAKERS</div><div style="font-size:12px;color:#94a3b8;line-height:1.8">${primHtml}</div></div>`:""}
+    ${funcHtml?`<div style="background:rgba(16,185,129,0.08);border-left:3px solid #34d399;padding:14px;border-radius:8px;margin-bottom:12px"><div style="font-size:12px;font-weight:700;color:#34d399;margin-bottom:8px">FUNCTIONAL LEADERS (Product-Specific)</div><div style="font-size:12px;color:#94a3b8;line-height:1.8">${funcHtml}</div></div>`:""}
+    ${ct.strategy?`<div style="background:rgba(245,158,11,0.08);border-left:3px solid #fbbf24;padding:14px;border-radius:8px"><div style="font-size:12px;font-weight:700;color:#fbbf24;margin-bottom:8px">SALES STRATEGY</div><div style="font-size:11px;color:#94a3b8;line-height:1.7">${ct.strategy}</div></div>`:""}
+    </div>`;
+  }
+
+  // Curinos target teams  from D.contacts.targetTeams[]
+  const teams=ct.targetTeams||[];
+  let teamsHtml="";
+  if(teams.length){
+    teamsHtml=`<div id="op-targets" class="section-anchor"></div><div class="panel"><h3>Curinos Target Teams -- Indicative Size &amp; Approach</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
+    ${teams.map(t=>`<div style="background:#0f172a;border:1px solid #334155;border-top:3px solid ${t.colour||"#60a5fa"};border-radius:8px;padding:12px"><div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:4px">${t.team}</div>${t.size?`<div style="font-size:10px;color:#64748b;margin-bottom:6px">${t.size}</div>`:""}<div style="font-size:11px;color:#94a3b8;line-height:1.5">${t.approach||""}</div>${t.products?`<div style="font-size:9px;color:#a78bfa;margin-top:6px"> ${t.products}</div>`:""}</div>`).join("")}
+    </div></div>`;
+  }
+  return execHtml+teamsHtml;
+}
+
+function siloAssessment(){
+  const silo=D.siloAssessment||{};
+  const integ=silo.integration||'partial';
+  const colours={integrated:"#34d399",partial:"#fbbf24",fragmented:"#f87171"};
+  const col=colours[integ]||"#fbbf24";
+  const bg={integrated:"rgba(16,185,129,0.08)",partial:"rgba(245,158,11,0.08)",fragmented:"rgba(248,113,113,0.08)"}[integ]||"rgba(245,158,11,0.08)";
+  const border={integrated:"rgba(16,185,129,0.3)",partial:"rgba(245,158,11,0.3)",fragmented:"rgba(248,113,113,0.3)"}[integ]||"rgba(245,158,11,0.3)";
+  const label={integrated:"INTEGRATED",partial:"PARTIAL",fragmented:"FRAGMENTED"}[integ]||"PARTIAL";
+
+  // Tooltip with clickable sources
+  const siloTipId="ttp-silo2";
+  const srcLinks=(silo.siloSrc||[]).map(s=>`<span onclick="window.open('${s.u}','_blank')" style="display:block;color:#60a5fa;cursor:pointer;text-decoration:underline;font-size:10px;margin-top:4px">${s.n} ↗</span>`).join('');
+  const siloTip=`<button class="tip-btn" onclick="tt('${siloTipId}')">i</button><div class="ttp" id="${siloTipId}"><div class="ttl">Silo Assessment Sources</div><div class="ttx">Assessment based on org structure disclosures, 10-K segment reporting, technology signals, and earnings call commentary.</div><div class="ttp-cite" style="margin-top:8px;padding-top:6px;border-top:1px solid #334155"><span style="font-size:9px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Sources</span>${srcLinks}</div></div>`;
+
+  // Verdict badge
+  const verdictHtml=`<div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;background:${bg};border:1px solid ${border};border-radius:8px;padding:14px">
+<div style="flex-shrink:0;text-align:center"><div style="font-size:28px;font-weight:900;color:${col}">⬤</div><div style="font-size:10px;font-weight:700;color:${col};text-transform:uppercase;letter-spacing:.06em;margin-top:2px">${label}</div></div>
+<div><div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:4px">${silo.verdict||''}</div><div style="font-size:11px;color:#94a3b8;line-height:1.6">${silo.intro||silo.description||''}</div></div>
+</div>`;
+
+  // Evidence grid (Integration signals vs Silo signals)
+  const intSigs=silo.integrationSignals||[];
+  const silSigs=silo.siloSignals||[];
+  let evidenceGrid='';
+  if(intSigs.length||silSigs.length){
+    const intItems=intSigs.map(s=>`<div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.05)"><div style="font-size:10px;color:#cbd5e1;line-height:1.4">${s.signal}</div><div style="font-size:9px;color:#475569;margin-top:2px">Source: ${s.src||''}</div></div>`).join('');
+    const silItems=silSigs.map(s=>`<div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.05)"><div style="font-size:10px;color:#cbd5e1;line-height:1.4">${s.signal}</div><div style="font-size:9px;color:#475569;margin-top:2px">Source: ${s.src||''}</div></div>`).join('');
+    evidenceGrid=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+<div style="background:rgba(15,23,42,0.5);border:1px solid rgba(52,211,153,0.2);border-radius:8px;padding:14px">
+  <div style="font-size:11px;font-weight:700;color:#34d399;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">✓ Integration Signals</div>
+  ${intItems||"<div style='font-size:10px;color:#64748b'>No integration signals available.</div>"}
+</div>
+<div style="background:rgba(15,23,42,0.5);border:1px solid rgba(248,113,113,0.2);border-radius:8px;padding:14px">
+  <div style="font-size:11px;font-weight:700;color:#f87171;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">✗ Silo Signals</div>
+  ${silItems||"<div style='font-size:10px;color:#64748b'>No silo signals available.</div>"}
+</div>
+</div>`;
+  } else {
+    // Fall back to groups
+    const rows=(silo.groups||[]).map(g=>{const gc=colours[g.status]||"#94a3b8";return`<div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px"><div style="font-size:12px;font-weight:700;color:#fff">${g.title}</div><span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:6px;background:rgba(100,116,139,0.2);color:${gc};border:1px solid ${gc}">${(g.status||'').toUpperCase()}</span></div><div style="font-size:11px;color:#94a3b8;line-height:1.5">${g.detail||''}</div>${g.salesAngle?`<div style="font-size:10px;color:#fbbf24;margin-top:4px">→ ${g.salesAngle}</div>`:''}</div>`;}).join('');
+    evidenceGrid=rows;
+  }
+
+  // Sales implications
+  const si=silo.salesImplications||[];
+  let implHtml='';
+  if(si.length){
+    implHtml=`<div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.2);border-radius:8px;padding:14px;margin-top:4px">
+<div style="font-size:11px;font-weight:700;color:#60a5fa;margin-bottom:10px">Sales implications of ${label.toLowerCase()} silo structure:</div>
+${si.map(s=>`<div style="margin-bottom:8px"><strong style="color:#fff">${s.label}:</strong> <span style="font-size:11px;color:#94a3b8;line-height:1.6">${s.body}</span></div>`).join('')}
+</div>`;
+  } else if(silo.salesAngle){
+    implHtml=`<div class="ib ib-a" style="margin-top:8px"><div class="ibt">Sales Angle</div><p>${silo.salesAngle}</p></div>`;
+  }
+
+  return`<!-- SILO ASSESSMENT -->
+<div class="panel" style="margin-top:16px"><h3>🏛️ Silo Assessment — Integrated vs. Fragmented ${siloTip}</h3>
+<p style="font-size:11px;color:#64748b;margin-bottom:14px">Assessment based on org structure disclosures, 10-K segment reporting, technology signals, and earnings call commentary. Verified evidence only — no speculation.</p>
+${verdictHtml}${evidenceGrid}${implHtml}
+</div>`;
+}
+
+// ── TAB 3: BALANCE SHEET & FUNDING ────────────────────────────────────────
+function loansProd(){
+  const loans=D.loans||{mix:[],narrative:"",fullSuite:{}};
+  const mix=loans.mix||[];
+  const mixBars=mix.map(item=>{
+    const oppColour={high:"rgba(16,185,129,0.2)",medium:"rgba(245,158,11,0.2)",low:"rgba(107,114,128,0.2)",specialty:"rgba(107,114,128,0.2)"}[item.opp]||"rgba(107,114,128,0.2)";
+    const oppTextColour={high:"#34d399",medium:"#fbbf24",low:"#9ca3af",specialty:"#9ca3af"}[item.opp]||"#9ca3af";
+    const barColours={high:"linear-gradient(90deg,#3b82f6,#8b5cf6)",medium:"linear-gradient(90deg,#10b981,#34d399)",specialty:"linear-gradient(90deg,#06b6d4,#22d3ee)"}[item.opp]||"linear-gradient(90deg,#f59e0b,#fbbf24)";
+    return`<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:12px;color:#94a3b8;font-weight:600">${item.label}</span><div><span style="font-size:12px;color:#fff;font-weight:700">${item.pct}%</span><span style="font-size:9px;padding:2px 6px;border-radius:4px;font-weight:700;text-transform:uppercase;margin-left:8px;background:${oppColour};color:${oppTextColour}">${(item.opp||"").toUpperCase()}</span></div></div><div style="background:rgba(255,255,255,0.05);height:24px;border-radius:6px;overflow:hidden"><div style="width:${item.pct}%;height:100%;background:${barColours};display:flex;align-items:center;padding:0 8px;font-size:11px;color:#fff;font-weight:600">${item.value||""}</div></div>${item.note?`<div style="font-size:11px;color:#64748b;margin-top:2px;font-style:italic">${item.note}</div>`:""}</div>`;
+  }).join("");
+
+  // Funding mix panel  from D.loans.fundingMix[] OR D.funding.items[] (fallback)
+  const fundingRaw=loans.fundingMix||(D.funding&&D.funding.items)||[];
+  const fundingNote=loans.fundingNote||(D.funding&&D.funding.salesNote)||"";
+  let fundingHtml="";
+  if(fundingRaw.length){
+    const maxFund=Math.max(...fundingRaw.map(f=>f.pct||0))||100;
+    const fBars=fundingRaw.map(f=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:12px;color:#94a3b8">${f.label}</span><span style="font-size:12px;font-weight:700;color:${f.colour||"#60a5fa"}">${f.value||f.pct+"%"}</span></div><div style="background:rgba(255,255,255,0.05);height:18px;border-radius:4px;overflow:hidden"><div style="width:${((f.pct||0)/maxFund*100).toFixed(1)}%;height:100%;background:${f.colour||"#60a5fa"};opacity:0.7;border-radius:4px"></div></div>${f.note?`<div style="font-size:10px;color:#64748b;margin-top:2px;font-style:italic">${f.note}</div>`:""}</div>`).join("");
+    fundingHtml=`<div class="panel"><h3>Funding Mix &amp; Deposit Composition</h3>${fBars}${fundingNote?`<div style="background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.2);border-radius:8px;padding:10px;margin-top:10px"><div style="font-size:10px;font-weight:700;color:#60a5fa;margin-bottom:4px"> Curinos Sales Angle</div><div style="font-size:11px;color:#94a3b8;line-height:1.6">${fundingNote}</div></div>`:""}</div>`;
+  }
+
+  const suite=loans.fullSuite||{};
+  const suiteColours=["#60a5fa","#34d399","#fbbf24","#a78bfa","#ec4899","#06b6d4","#f87171","#fb923c"];
+  const suiteHtml=Object.entries(suite).map(([cat,prods],i)=>`<div style="margin-bottom:10px"><strong style="color:${suiteColours[i%suiteColours.length]}">${cat}:</strong> ${prods}</div>`).join("");
+
+  return anav([['Loan Portfolio','bs-loans'],['Sales Implications','bs-sales'],['Full Product Suite','bs-suite'],['Funding Stack','bs-funding'],['Deposit Mix','bs-deposit-mix'],['Maturity & Liquidity','bs-maturity']]) +
+  `<div id="bs-loans" class="section-anchor"></div>
+<div class="g2">
+<div class="panel" style="margin-bottom:0"><h3>Estimated Loan Portfolio Mix</h3><div style="position:relative;height:350px"><canvas id="loanPieChart"></canvas></div></div>
+<div class="panel" style="margin-bottom:0"><h3>Loan Mix -- Sales Implications</h3><div id="bs-sales" class="section-anchor"></div><div style="margin-top:16px">${mixBars}</div></div>
+</div>
+${loans.narrative?`<div class="ib ib-a"><div class="ibt">Loan Portfolio -- Sales Context</div><p>${loans.narrative}</p></div>`:""}
+<div id="bs-suite" class="section-anchor"></div>
+${suiteHtml?`<div class="panel"><h3>Full Product Suite</h3><div style="font-size:12px;color:#94a3b8;line-height:1.8;columns:2;column-gap:20px">${suiteHtml}</div></div>`:""}
+<div id="bs-funding" class="section-anchor"></div>
+${fundingHtml}
+<div id="bs-deposit-mix" class="section-anchor" style="margin-top:8px"></div>
+${(()=>{
+  const f=D.funding||{};
+  const items=f.items||[];
+  if(!items.length) return '';
+  const bars=items.map(item=>`<div style="margin-bottom:10px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+  <span style="font-size:11px;color:#94a3b8">${item.label}</span>
+  <span style="font-size:11px;font-weight:700;color:#fff">${item.value||''} <span style="color:#64748b">${item.pct||0}%</span></span>
+</div>
+<div style="background:rgba(255,255,255,0.07);border-radius:3px;height:8px">
+  <div style="width:${item.pct||0}%;height:100%;background:${item.colour||'#60a5fa'};border-radius:3px;transition:width .5s"></div>
+</div>
+${item.note?`<div style="font-size:10px;color:#64748b;margin-top:2px">${item.note}</div>`:''}
+</div>`).join('');
+  return `<div class="ib ib-b"><div class="ibt">Deposit Sub-Mix</div></div>
+<div class="panel">
+<div style="margin-bottom:12px">${bars}</div>
+${f.salesNote?`<div style="background:rgba(245,158,11,0.08);border-left:3px solid #fbbf24;padding:12px;border-radius:6px;font-size:11px;color:#94a3b8;line-height:1.6"><span style="font-weight:700;color:#fbbf24">🎯 Sales Angle: </span>${f.salesNote}</div>`:''}
+</div>`;
+})()}
+<div id="bs-maturity" class="section-anchor" style="margin-top:8px"></div>
+${(()=>{
+  const mp=D.maturityProfile||D.funding&&D.funding.maturityProfile||null;
+  const liq=D.liquidity||null;
+  let html='';
+  if(mp){
+    const buckets=mp.buckets||[];
+    const bktHtml=buckets.map(b=>`<div style="background:rgba(30,41,59,0.6);border-radius:6px;padding:10px;border-left:3px solid ${b.colour||'#60a5fa'}">
+<div style="font-size:10px;color:#64748b;margin-bottom:4px">${b.label||''}</div>
+<div style="font-size:18px;font-weight:700;color:#fff">${b.value||''}</div>
+<div style="font-size:10px;color:#94a3b8">${b.pct||''} of funding</div>
+${b.signal?`<div style="font-size:9px;color:#fbbf24;margin-top:4px">${b.signal}</div>`:''}
+</div>`).join('');
+    html+=`<div class="ib ib-b"><div class="ibt">Funding Maturity Profile & IRR Signal</div></div>
+<div class="panel">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px">${bktHtml}</div>
+${mp.salesAngle?`<div style="background:rgba(245,158,11,0.08);border-left:3px solid #fbbf24;padding:12px;border-radius:6px;font-size:11px;color:#94a3b8;line-height:1.6"><span style="font-weight:700;color:#fbbf24">🎯 Sales Angle: </span>${mp.salesAngle}</div>`:''}
+</div>`;
+  }
+  if(liq){
+    const kpis=liq.kpis||[];
+    const kpiHtml=kpis.map(k=>`<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px;text-align:center">
+<div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">${k.label||''}</div>
+<div style="font-size:24px;font-weight:700;color:${k.colour||'#60a5fa'}">${k.value||''}</div>
+${k.note?`<div style="font-size:10px;color:#64748b;margin-top:4px">${k.note}</div>`:''}
+</div>`).join('');
+    html+=`<div class="ib ib-b"><div class="ibt">Liquidity KPIs</div></div>
+<div class="panel">
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:12px">${kpiHtml}</div>
+${liq.salesNote?`<div style="background:rgba(245,158,11,0.08);border-left:3px solid #fbbf24;padding:12px;border-radius:6px;font-size:11px;color:#94a3b8;line-height:1.6"><span style="font-weight:700;color:#fbbf24">🎯 Sales Angle: </span>${liq.salesNote}</div>`:''}
+</div>`;
+  }
+  if(!mp&&!liq) html=`<div class="panel"><p style="color:#64748b;font-size:12px">Maturity profile and liquidity data not available — add maturityProfile{} and liquidity{} to the intel JSON to populate this section.</p></div>`;
+  return html;
+})()}
+`;
+}
+
+// ── TAB 4: STRATEGY & HEALTH ─────────────────────────────────────────────
+function stratHealth(){
+  return anav([['Strategic Themes','sh-themes'],['Growth Pillars','sh-pillars'],['Sales Timing','sh-timing'],['Health & SWOT','sh-swot']]) +
+  '<div id="sh-themes" class="section-anchor"></div>' +
+  st() +
+  '<div id="sh-swot" class="section-anchor" style="margin-top:8px"></div>' +
+  swotSWOTOnly();
+}
+
+function st(){
+  const intro=D.strategyIntro||"";
+  const introHtml=intro?`<div class="ib ib-g"><div class="ibt">Core Strategic Narrative</div><p>${intro}</p></div>`:"";
+
+  // Use strategyPillars[] for numbered strategy panels (preferred)
+  const pillars=D.strategyPillars||[];
+  let panelsHtml="";
+  if(pillars.length){
+    panelsHtml=pillars.map((p,i)=>`<div id="sh-pillars" class="section-anchor" style="${i===0?'':'margin-top:8px'}"></div>
+<div class="panel"><h3>Strategy ${i+1}: ${p.title||''}</h3>
+<p style="font-size:13px;color:#94a3b8;line-height:1.75">${p.body||''}</p>
+${p.curinosLink?`<div style="background:rgba(59,130,246,0.07);border-left:3px solid #60a5fa;padding:8px 12px;border-radius:4px;margin-top:10px;font-size:11px;font-weight:600;color:#60a5fa">→ Curinos products: ${p.curinosLink}</div>`:""}
+</div>`).join("");
+  } else {
+    // Fallback: split D.strategy on double newlines
+    const raw=typeof D.strategy==="string"?D.strategy:"";
+    const sections=raw.split("\n\n").filter(s=>s.trim());
+    panelsHtml=sections.map((sec,i)=>{
+      const colonIdx=sec.indexOf(":");
+      if(colonIdx>0&&colonIdx<60){
+        return`<div class="panel"><h3>Strategy ${i+1}: ${sec.slice(0,colonIdx).trim()}</h3><p style="font-size:13px;color:#94a3b8;line-height:1.75">${sec.slice(colonIdx+1).trim()}</p></div>`;
+      }
+      return`<div class="panel"><p style="font-size:13px;color:#94a3b8;line-height:1.75">${sec}</p></div>`;
+    }).join("");
+    if(!panelsHtml&&raw){
+      panelsHtml=`<div class="panel"><p style="font-size:13px;color:#94a3b8;line-height:1.75">${raw}</p></div>`;
+    }
+  }
+
+  // Sales timing windows
+  const timing=D.salesTiming||[];
+  const timingHtml=timing.length?`<div id="sh-timing" class="section-anchor"></div>
+<div class="ib ib-a" style="margin-top:0"><div class="ibt">Sales Timing Windows</div>
+<div class="g3" style="margin-top:10px">${timing.map(t=>`<div>
+<p style="font-size:12px;font-weight:700;color:${t.colour||"#fbbf24"};margin-bottom:5px">${t.label||""}</p>
+<p style="font-size:12px;color:#94a3b8;line-height:1.6">${t.body||""}</p>
+</div>`).join("")}</div></div>`:"";
+
+  return introHtml+panelsHtml+timingHtml;
+}
+
+function swot(){
+  const sw=D.swot||{strengths:[],weaknesses:[],opportunities:[],threats:[]};
+  const healthRating=D.healthRating||"";const healthNote=D.healthNote||"";
+  const healthColour=D.healthColour||"#34d399";
+  const mat=D.maturity||{overall:2,tier:"Tier 2",dimensions:[]};
+  const ov=mat.overall||2;const tier=mat.tier||"Tier 2";
+  const tierColour=ov>=3.5?"#34d399":ov>=3.0?"#60a5fa":ov>=2.0?"#fbbf24":"#f87171";
+  const tierBg=ov>=3.5?"rgba(16,185,129,0.15)":ov>=3.0?"rgba(59,130,246,0.15)":ov>=2.0?"rgba(245,158,11,0.15)":"rgba(248,113,113,0.15)";
+  const tierBorder=ov>=3.5?"rgba(16,185,129,0.4)":ov>=3.0?"rgba(59,130,246,0.4)":ov>=2.0?"rgba(245,158,11,0.4)":"rgba(248,113,113,0.4)";
+  const dimColours=["#60a5fa","#a78bfa","#34d399","#fbbf24","#f87171","#10b981"];
+  const dims=(mat.dimensions||[]).map((d,i)=>({...d,color:d.color||dimColours[i%dimColours.length]}));
+
+  const radarSVG=(()=>{
+    if(!dims.length)return"";
+    const cx=160,cy=155,r=100,n=dims.length;const angleStep=(Math.PI*2)/n;
+    const toXY=(i,val,maxR)=>{const angle=angleStep*i-Math.PI/2;return{x:cx+Math.cos(angle)*maxR*(val/4),y:cy+Math.sin(angle)*maxR*(val/4)};};
+    let rings="";[1,2,3,4].forEach(ring=>{const pts=dims.map((_,i)=>{const a=angleStep*i-Math.PI/2;return`${cx+Math.cos(a)*r*(ring/4)},${cy+Math.sin(a)*r*(ring/4)}`;}).join(" ");rings+=`<polygon points="${pts}" fill="none" stroke="#334155" stroke-width="${ring===4?1.5:0.8}" opacity="0.6"/>`;});
+    let axes="";dims.forEach((_,i)=>{const a=angleStep*i-Math.PI/2;axes+=`<line x1="${cx}" y1="${cy}" x2="${cx+Math.cos(a)*r}" y2="${cy+Math.sin(a)*r}" stroke="#334155" stroke-width="0.8" opacity="0.5"/>`;});
+    const scorePts=dims.map((d,i)=>{const p=toXY(i,d.score,r);return`${p.x},${p.y}`;}).join(" ");
+    let labels="";dims.forEach((d,i)=>{const a=angleStep*i-Math.PI/2;const lx=cx+Math.cos(a)*(r+22);const ly=cy+Math.sin(a)*(r+22);const words=d.title.split(" ");const line1=words.slice(0,2).join(" ");const line2=words.slice(2).join(" ");labels+=`<text x="${lx}" y="${ly-(line2?6:0)}" text-anchor="middle" fill="${d.color}" font-size="9" font-weight="600">${line1}</text>`;if(line2)labels+=`<text x="${lx}" y="${ly+8}" text-anchor="middle" fill="${d.color}" font-size="9" font-weight="600">${line2}</text>`;const p=toXY(i,d.score,r);labels+=`<circle cx="${p.x}" cy="${p.y}" r="4" fill="${d.color}" stroke="#0f172a" stroke-width="1.5"/>`;});
+    let ringLabels="";[1,2,3,4].forEach(ring=>{ringLabels+=`<text x="${cx+4}" y="${cy-r*(ring/4)+4}" fill="#475569" font-size="8">${ring}</text>`;});
+    return`<svg viewBox="0 0 320 310" style="width:100%;max-width:320px;display:block;margin:0 auto">${rings}${axes}<polygon points="${scorePts}" fill="rgba(59,130,246,0.15)" stroke="#3b82f6" stroke-width="2"/>${labels}${ringLabels}</svg>`;
+  })();
+
+  const dimCards=dims.map(d=>{
+    const filled=Math.round(d.score);
+    const dots=[1,2,3,4].map(i=>`<span style="display:inline-block;width:14px;height:14px;border-radius:50%;margin-right:3px;background:${i<=filled?d.color:"#334155"};border:1.5px solid ${i<=filled?d.color:"#475569"}"></span>`).join("");
+    const typeIcon={"+":"[+]","!":"!","=":"->"};
+    const evidence=(d.evidence||[]).map(s=>`<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04)"><span style="font-size:13px;flex-shrink:0;margin-top:1px">${typeIcon[s.icon]||"->"}</span><div><div style="font-size:11px;color:#94a3b8;line-height:1.55">${s.text}</div><div style="font-size:9px;color:#475569;margin-top:3px;font-style:italic"> ${s.cite||""}</div></div></div>`).join("");
+    return`<div style="background:#0f172a;border:1px solid #1e293b;border-left:3px solid ${d.color};border-radius:10px;margin-bottom:10px;overflow:hidden"><div style="padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.dim-chevron').style.transform=this.nextElementSibling.style.display==='none'?'rotate(0deg)':'rotate(180deg)'"><div><div style="font-size:10px;font-weight:700;color:${d.color};text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">${d.title}</div><div style="font-size:11px;color:#64748b">${d.summary||""}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-left:16px;flex-shrink:0"><div style="font-size:22px;font-weight:700;color:${d.color}">${d.score}<span style="font-size:12px;color:#475569">/4</span></div><div>${dots}</div><span class="dim-chevron" style="color:#475569;font-size:14px;transition:transform 0.3s">v</span></div></div><div style="display:none;padding:0 14px 14px"><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px">Evidence &amp; Signals</div>${evidence}${d.implication?`<div style="margin-top:10px;background:rgba(59,130,246,0.08);border-left:2px solid #3b82f6;padding:8px 10px;border-radius:4px"><div style="font-size:9px;font-weight:700;color:#60a5fa;text-transform:uppercase;margin-bottom:3px">Curinos Implication</div><div style="font-size:11px;color:#94a3b8;line-height:1.5">${d.implication}</div></div>`:""}</div></div>`;
+  }).join("");
+
+  const seqCards=(D.productSequencing||[]).map(s=>{
+    const c=s.active?"#60a5fa":"#475569";const bg=s.active?"rgba(59,130,246,0.12)":"rgba(255,255,255,0.02)";
+    return`<div style="background:${bg};border:1px solid ${s.active?c:"#334155"};border-radius:8px;padding:12px 14px;margin-bottom:8px;opacity:${s.active?1:0.6}"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px"><div><div style="font-size:10px;font-weight:700;color:${c};text-transform:uppercase;margin-bottom:3px">${s.tier}</div><div style="font-size:12px;color:#fff;font-weight:600;margin-bottom:4px">${s.products}</div><div style="font-size:11px;color:#94a3b8;line-height:1.5">${s.note||""}</div></div>${s.active?`<span style="background:${c};color:#0f172a;font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;white-space:nowrap;flex-shrink:0">SELL NOW</span>`:`<span style="background:#334155;color:#64748b;font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;white-space:nowrap;flex-shrink:0">FUTURE</span>`}</div></div>`;
+  }).join("");
+
+  const ca=D.curinosAngle||{};
+  return`<!-- HEALTH SECTION -->
+<div class="panel"><h3>Financial Health Assessment</h3>
+<div style="text-align:center;margin-bottom:16px"><span style="display:inline-block;padding:8px 20px;border-radius:8px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.4);color:${healthColour};font-size:14px;font-weight:700">${healthRating}</span>${healthNote?`<div style="font-size:11px;color:#64748b;margin-top:6px">${healthNote}</div>`:""}</div></div>
+<div class="swot-grid"><div class="swot-box swot-str"><div class="swot-title">[+] STRENGTHS</div><ul class="swot-list">${(sw.strengths||[]).map(s=>`<li>${s}</li>`).join("")}</ul></div><div class="swot-box swot-wea"><div class="swot-title">! AREAS TO MONITOR</div><ul class="swot-list">${(sw.weaknesses||[]).map(s=>`<li>${s}</li>`).join("")}</ul></div><div class="swot-box swot-opp"><div class="swot-title"> OPPORTUNITIES</div><ul class="swot-list">${(sw.opportunities||[]).map(s=>`<li>${s}</li>`).join("")}</ul></div><div class="swot-box swot-thr"><div class="swot-title"> THREATS</div><ul class="swot-list">${(sw.threats||[]).map(s=>`<li>${s}</li>`).join("")}</ul></div></div>
+${ca.title?`<div class="ib ib-b" style="margin-top:16px"><div class="ibt">${ca.title}</div><p>${ca.body||""}</p></div>`:""}
+<!-- DATA MATURITY SECTION -->
+<div class="panel" style="margin-top:8px"><h3>Data &amp; Analytics Maturity Score</h3>
+<div style="font-size:12px;color:#64748b;margin-bottom:20px">Assessed across ${dims.length} dimensions using publicly observable signals. Click any dimension to see the evidence.</div>
+<div class="g2" style="margin-bottom:20px"><div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:20px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center"><div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Overall Maturity Score</div><div style="font-size:64px;font-weight:700;color:${tierColour};line-height:1">${ov.toFixed(1)}</div><div style="font-size:14px;color:#fff;font-weight:600;margin-top:6px">out of 4 tiers</div><span style="display:inline-block;margin-top:12px;padding:5px 16px;border-radius:20px;background:${tierBg};border:1px solid ${tierBorder};color:${tierColour};font-size:12px;font-weight:700">${tier}</span><div style="margin-top:20px;width:100%">${dims.map(d=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><div style="flex:1;background:#0f172a;border-radius:4px;height:6px;overflow:hidden"><div style="width:${(d.score/4)*100}%;height:100%;background:${d.color};border-radius:4px"></div></div><span style="font-size:10px;color:${d.color};font-weight:700;min-width:24px;text-align:right">${d.score}</span><span style="font-size:10px;color:#64748b;min-width:110px">${d.title}</span></div>`).join("")}</div></div><div>${radarSVG}</div></div>
+${dimCards}</div>
+${seqCards?`<div class="panel" style="margin-top:8px"><h3>Maturity-Based Product Sequencing</h3>${seqCards}</div>`:""}`;
+}
+
+// SWOT-only version (no maturity) for stratHealth tab
+function swotSWOTOnly(){
+  const sw=D.swot||{strengths:[],weaknesses:[],opportunities:[],threats:[]};
+  const healthRating=D.healthRating||"";const healthColour=D.healthColour||"#34d399";const healthNote=D.healthNote||"";
+  const ca=D.curinosAngle||{};
+  return`<div class="panel"><h3>Financial Health Assessment</h3><div style="text-align:center;margin-bottom:16px"><span style="display:inline-block;padding:8px 20px;border-radius:8px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.4);color:${healthColour};font-size:14px;font-weight:700">${healthRating}</span>${healthNote?`<div style="font-size:11px;color:#64748b;margin-top:6px">${healthNote}</div>`:""}</div></div>
+<div class="swot-grid"><div class="swot-box swot-str"><div class="swot-title">[+] STRENGTHS</div><ul class="swot-list">${(sw.strengths||[]).map(s=>`<li>${s}</li>`).join("")}</ul></div><div class="swot-box swot-wea"><div class="swot-title">! AREAS TO MONITOR</div><ul class="swot-list">${(sw.weaknesses||[]).map(s=>`<li>${s}</li>`).join("")}</ul></div><div class="swot-box swot-opp"><div class="swot-title"> OPPORTUNITIES</div><ul class="swot-list">${(sw.opportunities||[]).map(s=>`<li>${s}</li>`).join("")}</ul></div><div class="swot-box swot-thr"><div class="swot-title"> THREATS</div><ul class="swot-list">${(sw.threats||[]).map(s=>`<li>${s}</li>`).join("")}</ul></div></div>
+${ca.title?`<div class="ib ib-b" style="margin-top:16px"><div class="ibt">${ca.title}</div><p>${ca.body||""}</p></div>`:""}`;
+}
+
+// ── TAB 5: ANALYTICS & TECHNOLOGY ────────────────────────────────────────
+function analyticsTech(){
+  const full=swot();
+  const maturityIdx=full.indexOf('<!-- DATA MATURITY SECTION -->');
+  const siloIdx=full.indexOf('<!-- SILO ASSESSMENT -->');
+  const maturityContent=maturityIdx>=0?full.substring(maturityIdx,siloIdx>maturityIdx?siloIdx:full.length):'';
+
+  // curinosAngle at the TOP of Analytics & Technology tab
+  const angleHtml=D.curinosAngle?`<div class="ib ib-g" style="margin-bottom:8px"><div class="ibt">🎯 ${D.curinosAngle.title||'Curinos Sales Angle'}</div><p style="font-size:13px;color:#94a3b8;line-height:1.7">${D.curinosAngle.body||''}</p></div>`:"";
+
+  return anav([['Curinos Angle','at-angle'],['Data Maturity','at-maturity'],['Decision Intelligence','at-dii'],['Digital Platforms','at-platforms'],['Capability Gaps','at-gaps']]) +
+  '<div id="at-angle" class="section-anchor"></div>' +
+  angleHtml +
+  '<div id="at-maturity" class="section-anchor" style="margin-top:8px"></div>' +
+  maturityContent +
+  '<div id="at-dii" class="section-anchor" style="margin-top:8px"></div>' +
+  dii() +
+  '<div id="at-platforms" class="section-anchor" style="margin-top:8px"></div>' +
+  atPlatforms() +
+  '<div id="at-gaps" class="section-anchor" style="margin-top:8px"></div>' +
+  atGaps();
+}
+
+function dii(){
+  const items=Array.isArray(D.decisionIntelligence)?D.decisionIntelligence:[];
+  if(!items.length) return '';
+
+  const tipId="ttp-di-src";
+  const srcLinks=(D.sources||[]).map(s=>`<span onclick="window.open('${s.url||s.u||''}','_blank')" style="display:block;color:#60a5fa;cursor:pointer;text-decoration:underline;font-size:10px;margin-top:4px">${s.label||s.n||''} ↗</span>`).join('');
+  const tip=`<button class="tip-btn" onclick="tt('${tipId}')">i</button><div class="ttp" id="${tipId}"><div class="ttl">Decision Intelligence Sources</div><div class="ttx">Signals sourced from institution earnings calls, FDIC filings, 10-K disclosures, job postings, and verified press releases.</div><div class="ttp-cite" style="margin-top:8px;padding-top:6px;border-top:1px solid #334155"><span style="font-size:9px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Sources</span>${srcLinks||'<span style="font-size:10px;color:#64748b">See sources tab</span>'}</div></div>`;
+
+  // Flat signal/implication/action format  structured DI cards
+  const isFlat=items.length&&(items[0].signal||items[0].implication);
+  if(isFlat){
+    const cards=items.map((di,i)=>{
+      const colours=['#60a5fa','#34d399','#fbbf24','#a78bfa','#f87171','#06b6d4'];
+      const col=colours[i%colours.length];
+      return`<div style="background:#0f172a;border:1px solid #1e293b;border-left:4px solid ${col};border-radius:8px;padding:16px;margin-bottom:12px">
+<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
+  <div style="font-size:13px;font-weight:700;color:#fff;flex:1">${di.signal||di.name||''}</div>
+  <span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(59,130,246,0.12);color:#60a5fa;border:1px solid rgba(59,130,246,0.25);flex-shrink:0;margin-left:10px">SIGNAL ${i+1}</span>
+</div>
+<div style="font-size:11px;color:#94a3b8;line-height:1.6;margin-bottom:10px">${di.implication||di.domain||''}</div>
+${di.action?`<div style="background:rgba(245,158,11,0.06);border-left:3px solid #fbbf24;padding:10px 12px;border-radius:4px;font-size:11px;color:#94a3b8;line-height:1.5"><span style="font-size:10px;font-weight:700;color:#fbbf24;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px">Seller Action</span>${di.action}</div>`:''}
+${di.url?`<a href="${di.url}" target="_blank" rel="noopener" style="font-size:10px;color:#60a5fa;text-decoration:underline;display:inline-block;margin-top:8px">↗ ${di.source||'View source'}</a>`:''}
+</div>`;
+    }).join('');
+
+    return`<div class="ib ib-b"><div class="ibt">🧠 Decision Intelligence Inventory ${tip}</div>
+<p style="font-size:12px;color:#94a3b8;margin-bottom:14px">Key signals that inform the Curinos sales approach for this institution. Each signal maps to a specific product recommendation and seller action.</p></div>
+<div>${cards}</div>`;
+  }
+
+  // Categorised format (category-based DI)
+  const catOrder=['Built In-House','Vendor -- Confirmed','Vendor -- Inferred','Gap -- No Capability','Open Source / Partner'];
+  const catColours={'Built In-House':'#34d399','Vendor -- Confirmed':'#60a5fa','Vendor -- Inferred':'#fbbf24','Gap -- No Capability':'#f87171','Open Source / Partner':'#a78bfa'};
+  const catBg={'Built In-House':'rgba(52,211,153,0.06)','Vendor -- Confirmed':'rgba(59,130,246,0.06)','Vendor -- Inferred':'rgba(245,158,11,0.06)','Gap -- No Capability':'rgba(248,113,113,0.06)','Open Source / Partner':'rgba(167,139,250,0.06)'};
+  const catBorder={'Built In-House':'rgba(52,211,153,0.25)','Vendor -- Confirmed':'rgba(59,130,246,0.25)','Vendor -- Inferred':'rgba(245,158,11,0.25)','Gap -- No Capability':'rgba(248,113,113,0.25)','Open Source / Partner':'rgba(167,139,250,0.25)'};
+  const byCategory={};
+  items.forEach(item=>{const c=item.category||'Vendor -- Inferred';if(!byCategory[c])byCategory[c]=[];byCategory[c].push(item);});
+  const cols=catOrder.filter(c=>byCategory[c]&&byCategory[c].length).map(catName=>{
+    const col=catColours[catName]||'#60a5fa';
+    const bg=catBg[catName]||'rgba(59,130,246,0.06)';
+    const brd=catBorder[catName]||'rgba(59,130,246,0.25)';
+    const rows=byCategory[catName].map(item=>`<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.04)">
+<div style="font-size:11px;font-weight:700;color:#fff;margin-bottom:2px">${item.name||''}</div>
+<div style="font-size:10px;color:#64748b;margin-bottom:3px">${item.domain||item.category||''}</div>
+<div style="font-size:10px;color:#94a3b8;line-height:1.4">${item.signal||item.note||''}${item.url?` <a href="${item.url}" target="_blank" style="color:#60a5fa;text-decoration:underline">↗</a>`:''}</div>
+</div>`).join('');
+    return`<div style="background:${bg};border:1px solid ${brd};border-top:3px solid ${col};border-radius:8px;padding:14px">
+<div style="font-size:11px;font-weight:700;color:${col};text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">${catName}</div>
+${rows}
+</div>`;
+  }).join('');
+  return`<div class="ib ib-b"><div class="ibt">🧠 Decision Intelligence Inventory ${tip}</div>
+<p style="font-size:11px;color:#64748b;margin-bottom:14px">Classification based on publicly observable signals only. Verify during discovery conversations.</p></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">${cols}</div>`;
+}
+
+function atPlatforms(){
+  const platforms=D.techPlatforms||[];
+  if(!platforms.length)return"";
+  const statusClass={production:"cap-verified",verified:"cap-verified",advanced:"cap-verified",
+    inferred:"cap-inferred","partial":"cap-inferred",emerging:"cap-inferred",
+    gap:"cap-gap",missing:"cap-gap"};
+  const cards=platforms.map(p=>{
+    const cls=statusClass[p.maturity||p.status]||"cap-inferred";
+    const badge=(p.maturity||p.status||"inferred").toUpperCase();
+    const srcLink=p.url||p.src||'';
+    const srcHtml=srcLink?`<div style="margin-top:8px"><a href="${srcLink}" target="_blank" rel="noopener" style="font-size:10px;color:#60a5fa;text-decoration:underline;cursor:pointer">↗ View Source</a></div>`:'';
+    return`<div class="cap-card"><div class="cap-header"><span class="cap-name">${p.name}</span><span class="cap-badge ${cls}">${badge}</span></div><p class="cap-desc">${p.description||p.note||''}</p>${srcHtml}</div>`;
+  }).join("");
+  return`<div class="panel"><h3>💻 Verified Digital Platforms & Technology Partnerships</h3>
+<div class="ib ib-b" style="margin-bottom:14px"><div class="ibt">Verification Standard</div><p style="font-size:11px;color:#94a3b8">Platforms sourced from IR press releases, 10-K filings, earnings calls, or official product pages. PRODUCTION = confirmed live. INFERRED = based on industry disclosure or technology signals.</p></div>
+<div class="g2">${cards}</div></div>`;
+}
+
+function atGaps(){
+  const cg=D.capabilityGaps||{};
+  const strengths=cg.strengths||[];
+  const gaps=cg.gaps||cg.opportunities||[];
+  if(!strengths.length&&!gaps.length)return"";
+  const strengthItems=strengths.map(s=>`<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">
+<span style="color:#34d399;font-weight:700;flex-shrink:0">✓</span>
+<span style="font-size:11px;color:#94a3b8;line-height:1.5">${s}</span>
+</div>`).join("");
+  const gapItems=gaps.map(g=>`<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">
+<span style="color:#fbbf24;font-weight:700;flex-shrink:0">🎯</span>
+<span style="font-size:11px;color:#94a3b8;line-height:1.5">${g}</span>
+</div>`).join("");
+  return`<div id="at-gaps" class="section-anchor" style="margin-top:8px"></div>
+<div class="panel"><h3>🎯 Capability Gap Map — Curinos Opportunity Zones</h3>
+${cg.intro?`<p style="font-size:12px;color:#94a3b8;margin-bottom:14px">${cg.intro}</p>`:""}
+<div class="g2" style="gap:16px">
+<div><div style="font-size:11px;font-weight:700;color:#34d399;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">✅ Strong — Protect & Extend</div>${strengthItems}</div>
+<div><div style="font-size:11px;font-weight:700;color:#fbbf24;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">🎯 Gap — Highest Curinos Value</div>${gapItems}</div>
+</div>
+${cg.salesNote?`<div style="background:rgba(245,158,11,0.08);border-left:3px solid #fbbf24;padding:12px;border-radius:6px;font-size:11px;color:#94a3b8;line-height:1.6;margin-top:12px"><span style="font-weight:700;color:#fbbf24">Sales Note: </span>${cg.salesNote}</div>`:""}
+</div>`;
+}
+
+// ── TAB 6: PEER COMPARISON ────────────────────────────────────────────────
+function peer(){
+  const peerKey=Object.keys(D.peers||{})[0]||"regionals";
+  const rows=D.peers[peerKey]||[];
+  if(!rows.length)return`<div class="panel"><p style="color:#64748b">No peer data available.</p></div>`;
+  const target=rows[0];const peers=rows.slice(1);
+  const metaKeys=["a","br","st","cet1","roaa","roae","nim","eff","dep_cost"];
+  const labels={a:"Assets ($B)",br:"Branches",st:"States",cet1:"CET1 %",roaa:"ROAA",roae:"ROAE",nim:"NIM",eff:"Efficiency %",dep_cost:"Deposit Cost"};
+  const validKeys=metaKeys.filter(k=>target[k]!==undefined&&target[k]!==null);
+  const higherIsBetterKeys=["cet1","roaa","roae","nim","a","br"];
+
+  // Commentary box helper  coloured panel below each chart/table
+  const commentBox=(content,colour)=>{
+    const c=colour||"#fbbf24";
+    const bg=colour==="#34d399"?"rgba(16,185,129,0.07)":colour==="#f87171"?"rgba(239,68,68,0.07)":"rgba(245,158,11,0.07)";
+    const border=colour==="#34d399"?"rgba(16,185,129,0.25)":colour==="#f87171"?"rgba(239,68,68,0.25)":"rgba(245,158,11,0.25)";
+    return`<div style="background:${bg};border:1px solid ${border};border-left:3px solid ${c};border-radius:8px;padding:14px;margin-top:10px"><div style="font-size:10px;font-weight:700;color:${c};text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Observation &amp; Sales Angle</div><div style="font-size:11px;color:#94a3b8;line-height:1.7">${content}</div></div>`;
+  };
+
+  const safeNum=v=>parseFloat(String(v||0).replace(/[~$%,\s]/g,""));
+
+  // Table row: TARGET row coloured green/red from FOB perspective; competitor rows coloured inverse
+  const makeRow=(r,isTarget)=>{
+    const bg=isTarget?"background:#1e3a5f;":"";
+    const cells=validKeys.map(k=>{
+      let val=r[k];if(val===undefined||val===null)return`<td class="tc" style="color:#64748b">--</td>`;
+      let style="";
+      const higher=higherIsBetterKeys.includes(k);
+      if(isTarget){
+        // Colour the TARGET cells vs peer average: green=leading, red=lagging
+        const peerVals=peers.map(p=>safeNum(p[k])).filter(v=>!isNaN(v)&&v>0);
+        if(peerVals.length){
+          const avg=peerVals.reduce((a,b)=>a+b,0)/peerVals.length;
+          const tv=safeNum(val);
+          if(!isNaN(tv)){
+            if(higher){style=tv>avg?"color:#34d399;font-weight:700":tv<avg?"color:#f87171;font-weight:700":"";}
+            else{style=tv<avg?"color:#34d399;font-weight:700":tv>avg?"color:#f87171;font-weight:700":"";}
+          }
+        }
+      } else {
+        // Colour competitor cells: green=worse than target (FOB advantage), red=better than target (watch)
+        const tv=safeNum(target[k]);const cv=safeNum(val);
+        if(!isNaN(tv)&&!isNaN(cv)){
+          if(higher){style=cv<tv?"color:#34d399;font-weight:600":cv>tv?"color:#f87171;font-weight:600":"";}
+          else{style=cv>tv?"color:#34d399;font-weight:600":cv<tv?"color:#f87171;font-weight:600":"";}
+        }
+      }
+      const cellBg=isTarget?"background:#1e3a5f;":"";
+      return`<td class="tc" style="${cellBg}${style}">${val}</td>`;
+    });
+    return`<tr style="${isTarget?bg:""}"><td class="tl" style="font-weight:600;color:${isTarget?"#60a5fa":"#94a3b8"};font-size:12px;${isTarget?"background:#1e3a5f;":""}">${r.n}${isTarget?" ◀":""}</td>${cells.join("")}</tr>`;
+  };
+
+  // Bar charts: blue=target, green=worse than target (advantage), red=better than target (watch)
+  const makeBar=(peersData,metricKey,higherIsBetter)=>{
+    const safeN=v=>parseFloat(String(v||0).replace(/[~$%,\s]/g,""));
+    const numRows=peersData.map(r=>({n:r.n,v:safeN(r[metricKey]),isTarget:r.n===target.n})).filter(r=>!isNaN(r.v)&&r.v>0);
+    if(!numRows.length)return"";
+    const maxV=Math.max(...numRows.map(r=>r.v));
+    const targetV=numRows.find(r=>r.isTarget)?.v;
+    return numRows.map(r=>{
+      const pct=(r.v/maxV*100).toFixed(1);
+      let barCol="#475569";
+      if(r.isTarget){barCol="#3b82f6";}
+      else if(targetV!==undefined){
+        const leading=(higherIsBetter&&r.v<targetV)||(!higherIsBetter&&r.v>targetV);
+        barCol=leading?"#34d399":"#f87171";
+      }
+      return`<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px"><div style="min-width:120px;font-size:12px;color:${r.isTarget?"#fff":"#94a3b8"};font-weight:${r.isTarget?"700":"400"}">${r.n}</div><div style="flex:1;height:22px;background:#1e293b;border-radius:4px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${barCol};border-radius:4px"></div></div><div style="min-width:45px;text-align:right;font-size:12px;font-weight:700;color:${r.isTarget?"#fff":barCol}">${r.v}%</div></div>`;
+    }).join("");
+  };
+
+  // Lead/watch summary
+  const summary=D.peers.summary||{};
+  let summaryHtml="";
+  if(summary.leads||summary.watch){
+    const leadsHtml=(summary.leads||[]).map(s=>`<li>${s}</li>`).join("");
+    const watchHtml=(summary.watch||[]).map(s=>`<li>${s}</li>`).join("");
+    summaryHtml=`<div id="pc-leads" class="section-anchor" style="margin-top:8px"></div><div class="panel"><h3>Where ${target.n} Leads &amp; Where to Watch</h3><div class="g2"><div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:16px"><div style="font-size:11px;font-weight:700;color:#34d399;text-transform:uppercase;margin-bottom:10px">[+] Leads Peers</div><ul class="swot-list">${leadsHtml}</ul></div><div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:16px"><div style="font-size:11px;font-weight:700;color:#f87171;text-transform:uppercase;margin-bottom:10px">! Watch Areas</div><ul class="swot-list">${watchHtml}</ul></div></div></div>`;
+  }
+
+  // Watchlist
+  const watchlist=D.peers.watchlist||[];
+  let watchlistHtml="";
+  if(watchlist.length){
+    const items=watchlist.map(w=>`<div style="background:#0f172a;border:1px solid #334155;border-left:3px solid ${w.colour||"#60a5fa"};border-radius:8px;padding:12px;margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px"><div style="font-size:12px;font-weight:700;color:#fff">${w.competitor}</div><span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:6px;background:rgba(100,116,139,0.2);color:${w.colour||"#60a5fa"}">${w.urgency||""}</span></div><div style="font-size:11px;color:#94a3b8;line-height:1.5">${w.detail||""}</div></div>`).join("");
+    watchlistHtml=`<div id="pc-watchlist" class="section-anchor" style="margin-top:8px"></div><div class="panel"><h3>Competitive Intelligence Watchlist</h3>${items}</div>`;
+  }
+
+  const depBars=makeBar(rows,"dep_cost",false);
+  const effBars=makeBar(rows,"eff",false);
+
+  // Commentary from D.peers.commentary{}  each key is a section (table/nim/radar/depositCost/efficiency)
+  const pc=D.peers.commentary||{};
+  const tableCommentHtml=(pc.table||D.peers.salesAngle)?commentBox(pc.table||D.peers.salesAngle,"#fbbf24"):"";
+
+  // Peer sourcing -- D.peers.peerSources[{n,u}]. Older dashboards carry none
+  // and must keep rendering exactly as before, so this is empty when absent.
+  const peerSrc=D.peers.peerSources||[];
+  const peerSrcHtml=peerSrc.length?`<div class="ttp-cite" style="margin-top:12px;padding-top:8px;border-top:1px solid #334155;font-style:normal"><span style="font-size:9px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Peer data sources</span>${peerSrc.map(s=>`<span onclick="window.open('${s.u}','_blank')" style="display:block;color:#60a5fa;cursor:pointer;text-decoration:underline;font-size:10px;margin-top:4px">${s.n} ↗</span>`).join("")}</div>`:"";
+  const nimCommentHtml=pc.nim?commentBox(pc.nim,"#3b82f6"):"";
+  const radarCommentHtml=pc.radar?commentBox(pc.radar,"#a78bfa"):"";
+  const depCommentHtml=(pc.depositCost||pc.dep_cost)?commentBox(pc.depositCost||pc.dep_cost,"#f87171"):"";
+  const effCommentHtml=(pc.efficiency||pc.eff)?commentBox(pc.efficiency||pc.eff,"#fbbf24"):"";
+
+  return anav([["Snapshot","pc-snapshot"],["Where Leads","pc-leads"],["Full Table","pc-table"],["NIM Trend","pc-nim"],["Deposit Cost","pc-deposit"],["Efficiency","pc-efficiency"],["Radar","pc-radar"],["Watchlist","pc-watchlist"]]) +
+  `<div id="pc-snapshot" class="section-anchor"></div>
+<div class="ib ib-b"><div class="ibt">Peer Comparison: ${target.n} vs. ${peers.length} Peers</div><p>On the target row: <span style="color:#34d399;font-weight:700">green</span> = leading peers. <span style="color:#f87171;font-weight:700">red</span> = lagging peers. On competitor rows: <span style="color:#34d399;font-weight:700">green</span> = worse than ${target.n}. <span style="color:#f87171;font-weight:700">red</span> = better than ${target.n} (watch).</p></div>` +
+  summaryHtml +
+  `<div id="pc-table" class="section-anchor" style="margin-top:8px"></div>
+<div class="panel" style="overflow-x:auto"><h3>${target.n} Peer Comparison Table</h3>
+<table style="width:100%;border-collapse:collapse;min-width:600px">
+<thead><tr style="border-bottom:1px solid #334155"><th class="tl" style="font-size:11px;font-weight:600;color:#64748b">Institution</th>${validKeys.map(k=>`<th class="tc" style="font-size:11px;font-weight:600;color:#64748b">${labels[k]||k}</th>`).join("")}</tr></thead>
+<tbody>${makeRow(target,true)}${peers.map(p=>makeRow(p,false)).join("")}</tbody>
+</table>
+${tableCommentHtml}
+${peerSrcHtml}
+</div>
+<div id="pc-nim" class="section-anchor" style="margin-top:8px"></div>
+<div class="g2">
+<div class="panel" style="margin-bottom:0"><h3>Net Interest Margin Trajectory</h3><div class="trend-container"><canvas id="nimTrendChart"></canvas></div>${nimCommentHtml}</div>
+<div class="panel" style="margin-bottom:0"><h3>Performance Radar -- All Key Metrics</h3><div class="radar-container"><canvas id="radarChart"></canvas></div>${radarCommentHtml}</div>
+</div>
+<div id="pc-deposit" class="section-anchor" style="margin-top:8px"></div>
+<div class="g2">
+${depBars?`<div class="panel" style="margin-bottom:0"><h3>Deposit Cost Comparison -- Lower is Better</h3>${depBars}${depCommentHtml}</div>`:""}
+${effBars?`<div class="panel" style="margin-bottom:0"><h3>Efficiency Ratio -- Lower is Better</h3><div id="pc-efficiency" class="section-anchor"></div>${effBars}${effCommentHtml}</div>`:""}
+</div>` +
+  watchlistHtml +
+  "";
+}
+
+// ── TAB 7: PRODUCT FIT & PLAYBOOK ─────────────────────────────────────────
+function productPlaybook(){
+  const pri2=D.products.filter(p=>p.pri===2);
+  const pri3=D.products.filter(p=>p.pri===3);
+  const navLinks=[['P1 Priority Products','pp-p1'],['P2 Products','pp-p2']];
+  if(pri3.length)navLinks.push(['P3 Products','pp-p3']);
+  navLinks.push(['90-Day Plan','pp-plan'],['Discovery Qs','pp-discovery'],['Email Templates','pp-emails'],['Landmines','pp-landmines'],['Proof Points','pp-proofpoints'],['Meeting Agenda','pp-agenda'],['ROI Calculator','pp-calc'],['Value Props','pp-valueprops']);
+
+  return anav(navLinks) +
+  '<div id="pp-p1" class="section-anchor"></div>' +
+  pr() +
+  '<hr style="border:none;border-top:2px solid #334155;margin:28px 0">' +
+  '<div id="pp-plan" class="section-anchor"></div>' +
+  salesPlaybook() +
+  `<div id="pp-calc" class="section-anchor" style="margin-top:8px"></div>` +
+  calcPanel();
+}
+
+function pr(){
+  const pri1=D.products.filter(p=>p.pri===1);
+  const pri2=D.products.filter(p=>p.pri===2);
+  const pri3=D.products.filter(p=>p.pri===3);
+  const total=D.products.length;
+
+  function scoringV4(p){
+    const s=p.scoring;
+    const cls=(v,g,m)=>v>=g?"sc-good":v>=m?"sc-mid":"sc-low";
+    const dim=(lab,w,v,g,m,why)=>`<div class="prod-scoring-dim"><span class="prod-scoring-label">${lab}</span><span class="prod-scoring-label" style="font-size:9px;color:#64748b">${w}</span><span class="prod-scoring-val ${cls(v,g,m)}">${v}</span><span class="prod-scoring-sub">${why||""}</span></div>`;
+    return `<div class="prod-scoring">
+      <div class="prod-scoring-title">📐 Product Fit Score Breakdown <span style="font-size:10px;color:#64748b;font-weight:400">· Catalogue V4, scored by score_v4.py</span></div>
+      <div class="prod-scoring-grid">
+        ${dim("Need","70% of base",s.need,80,60,s.painRationale)}
+        ${dim("Timing","30% of base",s.timing,80,60,s.timingRationale)}
+        ${dim("Maturity","readiness",s.maturity,80,50,s.matRationale)}
+        ${dim("Feasibility","readiness",s.feasibility,80,50,s.feasRationale)}
+        ${dim("Readiness","× multiplier",Math.round((s.readiness||0)*100)/100,0.9,0.75,"0.60 + 0.40 × mean(Maturity, Feasibility) / 100")}
+      </div>
+      <div class="prod-scoring-formula">${s.formula||""}</div>
+      ${s.gateRationale?`<div class="prod-scoring-tags"><strong>Gates:</strong> ${s.gateRationale}</div>`:""}
+      ${s.caps?`<div class="prod-scoring-tags"><strong>Caps &amp; floors applied:</strong> ${s.caps}</div>`:""}
+    </div>`;
+  }
+  function renderProd(p,idx){
+    const priColour={1:"#34d399",2:"#60a5fa",3:"#94a3b8"}[p.pri]||"#94a3b8";
+    const fitBar=p.fit?`<div style="margin-top:8px;margin-bottom:4px"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:10px;color:#64748b">Fit Score</span><span style="font-size:11px;font-weight:700;color:${priColour}">${p.fit}%</span></div><div style="background:#0f172a;height:6px;border-radius:3px"><div style="width:${p.fit}%;height:100%;background:${priColour};border-radius:3px"></div></div></div>`:"";
+    return`<div class="prod-collapse" id="prod-${idx}">
+      <div class="prod-header" onclick="toggleProduct(${idx})">
+        <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+          <span style="display:inline-block;padding:3px 10px;border-radius:6px;font-size:9px;font-weight:700;text-transform:uppercase;flex-shrink:0;background:${priColour=="#34d399"?"rgba(16,185,129,0.2)":priColour=="#60a5fa"?"rgba(59,130,246,0.2)":"rgba(100,116,139,0.2)"};color:${priColour};border:1px solid ${priColour}">P${p.pri}</span>
+          <div style="min-width:0"><div class="prod-cat">${p.cat||""}</div><div class="prod-name">${p.name}${p.roadmap?` <span style="font-size:9px;font-weight:700;color:#fbbf24;border:1px solid #fbbf24;border-radius:4px;padding:1px 5px;margin-left:4px">ROADMAP — NOT YET AVAILABLE</span>`:""}${p.availabilityUnconfirmed?` <span style="font-size:9px;font-weight:700;color:#f87171;border:1px solid #f87171;border-radius:4px;padding:1px 5px;margin-left:4px">AVAILABILITY UNCONFIRMED</span>`:""}</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;flex-shrink:0">${fitBar}<span class="prod-expand" id="expand-${idx}">+</span></div>
+      </div>
+      <div class="prod-body" id="body-${idx}">
+        <div class="prod-section"><div class="prod-section-title"> Why ${D.basic.name} Needs This</div><div class="prod-text">${p.need||""}</div></div>
+        <div class="prod-section"><div class="prod-section-title">📦 What It Does</div><div class="prod-text">${p.what||""}</div></div>
+        <div class="prod-section"><div class="prod-section-title"> Why This Matters Now</div><div class="prod-text">${p.why||""}</div></div>
+        ${p.use&&p.use.length?`<div class="prod-section"><div class="prod-section-title"> Specific Use Cases</div><ul class="prod-list">${p.use.map(u=>`<li>${u}</li>`).join("")}</ul></div>`:""}
+        <div class="prod-roi"><div class="prod-roi-item"><div class="prod-roi-label"> ROI Estimate</div><div class="prod-roi-value">${p.roi||"--"}</div></div><div class="prod-roi-item"><div class="prod-roi-label"> Ideal Timeline</div><div class="prod-roi-value">${p.time||"--"}</div></div></div>
+        ${p.talk?`<div class="prod-talk"><div class="prod-talk-label">💬 Sales Talk Track</div><div class="prod-talk-text">"${p.talk}"</div></div>`:""}
+        ${p.objections&&p.objections.length?`<div class="prod-objections"><div class="prod-objections-title">🛡 Objection Handling</div>${p.objections.map(obj=>`<div class="prod-objection"><strong>Q: ${obj.q}</strong>A: ${obj.a}</div>`).join("")}</div>`:""}
+        ${p.contacts?`<div class="prod-contacts"><strong>Key Contacts:</strong> ${p.contacts}</div>`:""}
+        ${p.scoring&&p.scoring.modelVersion==="V4"?scoringV4(p):p.scoring?`<div class="prod-scoring">
+          <div class="prod-scoring-title">📐 Product Fit Score Breakdown</div>
+          <div class="prod-scoring-grid">
+            <div class="prod-scoring-dim"><span class="prod-scoring-label">Size &amp; Type</span><span class="prod-scoring-label" style="font-size:9px;color:#64748b">15% weight</span><span class="prod-scoring-val ${p.scoring.sizeType>=80?"sc-good":p.scoring.sizeType>=50?"sc-mid":"sc-low"}">${p.scoring.sizeType}</span><span class="prod-scoring-sub">${p.scoring.sizeRationale||""}</span></div>
+            <div class="prod-scoring-dim"><span class="prod-scoring-label">Segment</span><span class="prod-scoring-label" style="font-size:9px;color:#64748b">25% weight</span><span class="prod-scoring-val ${p.scoring.segment>=80?"sc-good":p.scoring.segment>=50?"sc-mid":"sc-low"}">${p.scoring.segment}</span><span class="prod-scoring-sub">${p.scoring.segRationale||""}</span></div>
+            <div class="prod-scoring-dim"><span class="prod-scoring-label">Maturity</span><span class="prod-scoring-label" style="font-size:9px;color:#64748b">20% weight</span><span class="prod-scoring-val ${p.scoring.maturity>=80?"sc-good":p.scoring.maturity>=50?"sc-mid":"sc-low"}">${p.scoring.maturity}</span><span class="prod-scoring-sub">${p.scoring.matRationale||""}</span></div>
+            <div class="prod-scoring-dim"><span class="prod-scoring-label">Need</span><span class="prod-scoring-label" style="font-size:9px;color:#64748b">30% weight</span><span class="prod-scoring-val ${p.scoring.need>=80?"sc-good":p.scoring.need>=60?"sc-mid":"sc-low"}">${p.scoring.need}</span><span class="prod-scoring-sub">${p.scoring.painRationale||""}</span></div>
+            <div class="prod-scoring-dim"><span class="prod-scoring-label">Feasibility</span><span class="prod-scoring-label" style="font-size:9px;color:#64748b">10% weight</span><span class="prod-scoring-val ${p.scoring.feasibility>=80?"sc-good":p.scoring.feasibility>=50?"sc-mid":"sc-low"}">${p.scoring.feasibility}</span><span class="prod-scoring-sub">${p.scoring.feasRationale||""}</span></div>
+          </div>
+          <div class="prod-scoring-formula">${p.scoring.formula||""}</div>
+          ${p.scoring.stratTags?`<div class="prod-scoring-tags"><strong>Strategy tag matches:</strong> ${p.scoring.stratTags}</div>`:""}
+        </div>`:""}
+      </div>
+    </div>`;
+  }
+
+  const fitIntro=D.productFitIntro||("Product Fit Analysis -- "+D.basic.name);
+  const fitIntroBody=D.productFitIntroBody||(`Analysis of ${total} Curinos products ranked by relevance. Click any product for details.`);
+  const subs=D.productSectionSubtitles||{};
+  const sections=[
+    {id:"pp-p1",title:"Priority 1 — Mission Critical",subtitle:subs.p1||"Highest-fit products based on Section K scoring. Immediate engagement recommended.",products:pri1},
+    {id:"pp-p2",title:"Priority 2 — Important",subtitle:subs.p2||"Strong fit. Build on P1 engagement — typically months 2-6.",products:pri2},
+    {id:"pp-p3",title:"Priority 3 — Strategic",subtitle:subs.p3||"Moderate fit or longer adoption runway. Plant seeds now.",products:pri3}
+  ].filter(s=>s.products.length);
+
+  // DNR products (excluded from playbook: failed a hard gate, or scored below the floor — 40 in V3, 50 in V4)
+  const dnrProducts=D.dnrProducts||[];
+
+  // Scoring summary panel
+  const allFits=D.products.map(p=>p.fit||0);
+  const avgFit=allFits.length?Math.round(allFits.reduce((a,b)=>a+b,0)/allFits.length):0;
+  const scoringNote=D.productScoringNote||"Products scored using Curinos Section K methodology: Size & Type (15%) + Segment (25%) + Maturity (20%) + Need (30%) + Feasibility (10%). Priority assignment: P1 ≥75 with NeedFit ≥70; P2 = 55–74; P3 = 40–54. Products below 40 or with SegmentFit=0 are excluded (DNR).";
+
+  const summaryPanel=`<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px;margin-bottom:16px">
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px">
+  <div style="text-align:center"><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Products Scored</div><div style="font-size:22px;font-weight:700;color:#f8fafc">${total}</div></div>
+  <div style="text-align:center"><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">P1 Priority</div><div style="font-size:22px;font-weight:700;color:#34d399">${pri1.length}</div></div>
+  <div style="text-align:center"><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">P2 / P3</div><div style="font-size:22px;font-weight:700;color:#60a5fa">${pri2.length+pri3.length}</div></div>
+  <div style="text-align:center"><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Avg Fit Score</div><div style="font-size:22px;font-weight:700;color:#fbbf24">${avgFit}%</div></div>
+</div>
+<div style="font-size:10px;color:#475569;border-top:1px solid #1e293b;padding-top:8px">📐 ${scoringNote}</div>
+</div>`;
+
+  const dnrHtml=dnrProducts.length?`<div style="margin-top:16px;padding:12px;background:rgba(100,116,139,0.05);border:1px solid #1e293b;border-radius:8px">
+<div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">🚫 Excluded Products (DNR) — Not recommended for this institution</div>
+<div style="font-size:10px;color:#475569;margin-bottom:10px">Products below the fit threshold for this institution based on size gates, segment gaps, or low need fit. Shown for transparency.</div>
+${dnrProducts.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #0f172a"><span style="font-size:11px;color:#475569">${p.name}</span><span style="font-size:10px;color:#374151;background:#111827;padding:2px 8px;border-radius:4px">${p.reason||"Below fit threshold"}</span></div>`).join("")}
+</div>`:"";
+
+  return`<div class="ib ib-b"><div class="ibt">${fitIntro}</div><p>${fitIntroBody}</p></div>
+${summaryPanel}
+${sections.map(sec=>`<div id="${sec.id}" class="section-anchor"></div><div class="panel"><h3>${sec.title}</h3><p style="font-size:12px;color:#94a3b8;margin-bottom:12px">${sec.subtitle}  <strong style="color:#f8fafc">${sec.products.length} products</strong></p>${sec.products.map(p=>renderProd(p,productNameToIndex[p.name])).join("")}</div>`).join("")}
+${dnrHtml}`;
+}
+
+// ── SALES PLAYBOOK ────────────────────────────────────────────────────────
+function salesPlaybook(){
+  const sp=D.salesPlaybook||{};
+  const planHtml=(sp.actionPlan||[]).map((step,i)=>{
+    const colours=["#ef4444","#fbbf24","#10b981","#3b82f6"];const tc=colours[i%colours.length];
+    return`<div style="position:relative;margin-bottom:22px"><div style="position:absolute;left:-22px;top:4px;width:12px;height:12px;border-radius:50%;background:${tc};border:2px solid #0f172a"></div><div style="font-size:12px;font-weight:700;color:${tc};margin-bottom:5px">${step.period}</div><div style="font-size:12px;color:#94a3b8;line-height:1.7">${step.body}</div></div>`;
+  }).join("");
+
+  const discHtml=(sp.discoveryQ||[]).map(group=>{
+    const qHtml=(group.questions||[]).map(q=>`<div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #334155"><div style="font-size:10px;font-weight:700;color:#60a5fa;text-transform:uppercase;margin-bottom:3px">${q.topic}</div><div style="font-style:italic;color:#cbd5e1">"${q.q}"</div></div>`).join("");
+    return`<div class="panel"><h3>💬 Discovery Questions -- ${group.audience}</h3><div style="font-size:12px;color:#94a3b8;line-height:1.8">${qHtml}</div></div>`;
+  }).join("");
+
+  const emailHtml=(sp.emailTemplates||[]).map((t,i)=>{
+    const c=i===0?"#60a5fa":"#34d399";
+    return`<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px"><div style="font-size:11px;font-weight:700;color:${c};text-transform:uppercase;margin-bottom:8px">${t.label}</div><div style="font-size:11px;color:#94a3b8;line-height:1.8">${t.body}</div></div>`;
+  }).join("");
+
+  const landmineHtml=(sp.landmines||[]).map(l=>`<div style="background:#0f172a;border:1px solid #334155;border-left:3px solid ${l.colour||"#f87171"};border-radius:8px;padding:14px"><div style="font-size:10px;font-weight:700;color:${l.colour||"#f87171"};text-transform:uppercase;margin-bottom:6px">${l.competitor}</div><div style="font-size:12px;font-style:italic;color:#e2e8f0;margin-bottom:8px">${l.objection}</div><div style="font-size:11px;color:#94a3b8;line-height:1.6"><strong style="color:#fff">Your response:</strong> ${l.rebuttal}</div></div>`).join("");
+
+  const ppHtml=(sp.proofPoints||[]).map(p=>`<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px;text-align:center"><div style="font-size:22px;font-weight:700;color:${p.colour||"#34d399"};margin-bottom:6px">${p.stat}</div><div style="font-size:11px;color:#94a3b8;line-height:1.5">${p.label}</div></div>`).join("");
+
+  const agendaHtml=(sp.agenda||[]).map(a=>`<div style="display:flex;gap:12px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #334155"><div style="min-width:75px;font-size:11px;font-weight:700;color:#60a5fa;padding-top:2px">${a.time}</div><div><div style="font-weight:700;color:#fff;margin-bottom:3px">${a.title}</div><div style="font-size:11px;line-height:1.6">${a.detail}</div></div></div>`).join("");
+
+  const vpHtml=(sp.valueProps||[]).map(v=>`<div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px"><div style="font-size:10px;font-weight:700;color:#fbbf24;margin-bottom:4px">${v.audience}</div><div style="font-size:11px;color:#cbd5e1;font-style:italic;line-height:1.5">"${v.pitch}"</div></div>`).join("");
+
+  return`
+<div class="ib ib-g"><div class="ibt"> Sales Playbook -- ${D.basic.name}</div><p>${sp.intro||"Everything a seller needs to walk into this meeting prepared."}</p></div>
+${planHtml?`<div id="pp-plan" class="section-anchor"></div><div class="panel"><h3> 90-Day Sales Action Plan</h3><div style="position:relative;padding-left:28px"><div style="position:absolute;left:11px;top:0;bottom:0;width:2px;background:#334155"></div>${planHtml}</div></div>`:""}
+${discHtml?`<div id="pp-discovery" class="section-anchor"></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">${discHtml}</div>`:""}
+${emailHtml?`<div id="pp-emails" class="section-anchor"></div><div class="panel"><h3>✉️ Email Templates</h3><div class="g2" style="margin-bottom:0">${emailHtml}</div></div>`:""}
+${landmineHtml?`<div id="pp-landmines" class="section-anchor"></div><div class="panel"><h3>⚠️ Competitive Landmines -- What Competitors Will Say</h3><div class="g2">${landmineHtml}</div></div>`:""}
+${ppHtml?`<div id="pp-proofpoints" class="section-anchor"></div><div class="panel"><h3>📌 Memorize These -- Quick Proof Points</h3><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">${ppHtml}</div></div>`:""}
+${agendaHtml?`<div id="pp-agenda" class="section-anchor"></div><div class="panel"><h3>🗓 Suggested Meeting Agenda</h3><div style="font-size:12px;color:#94a3b8;line-height:1.8">${agendaHtml}</div></div>`:""}
+${vpHtml?`<div id="pp-valueprops" class="section-anchor"></div><div class="ib ib-a"><div class="ibt">🎤 One-Sentence Value Props -- By Audience</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">${vpHtml}</div></div>`:""}
+<div style="text-align:center;margin-top:20px;padding-bottom:10px">
+<button onclick="window.print()" style="background:#334155;border:1px solid #475569;color:#e2e8f0;padding:10px 24px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-right:10px"> Print / Save as PDF</button>
+<button onclick="copyBrief()" id="copyBriefBtn" style="background:#1e40af;border:1px solid #3b82f6;color:#e2e8f0;padding:10px 24px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer"> Copy 1-Page Brief</button>
+</div>`;
+}
+
+// ROI Calculator  seller-controlled inputs
+function calcPanel(){
+  // Prefer totalDepositsB from D.loans (populated from JSON funding.totalDepositsB via build.py)
+  // Fall back to totalLoansB*1.3 estimate if deposits not available
+  const _rawDep=D.loans&&D.loans.totalDepositsB?D.loans.totalDepositsB:(D.loans&&D.loans.totalLoansB?Math.round(D.loans.totalLoansB*1.3):50);
+  const depDefault=_rawDep;
+  // Scale bands: micro (<2B), community (2-50B), regional (50-500B), large (500B+)
+  const depMin=depDefault<2?0.05:depDefault<50?1:depDefault<500?10:100;
+  const depMax=depDefault<2?Math.max(depDefault*4,2):depDefault<50?Math.min(depDefault*3,150):depDefault<500?Math.min(depDefault*2,1000):3000;
+  const depStep=depDefault<2?0.01:depDefault<50?1:depDefault<500?5:50;
+  const depLabel=(v)=>v<1?'$'+(v*1000).toFixed(0)+'M':v<1000?'$'+v.toLocaleString()+'B':'$'+(v/1000).toFixed(2)+'T';
+  return `<div id="pp-calc" class="section-anchor" style="margin-top:8px"></div>
+<div class="panel">
+  <h3>💰 Live ROI Calculator — Use During Meetings</h3>
+  <p style="font-size:12px;color:#94a3b8;margin-bottom:16px">Enter the actual deal size, adjust the deposit base and improvement assumption, and show the client their ROI live on screen. Built for the ROI Framing step of the meeting agenda above.</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+    <div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:11px;font-weight:700;color:#fbbf24;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:6px">① Curinos Contract Value ($M) <span style="color:#f59e0b;font-size:9px">— Enter actual deal size first</span></label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:16px;color:#64748b;font-weight:700">$</span>
+          <input type="number" id="pp-calc-contract" min="0.1" max="50" value="" placeholder="e.g. 1.5"
+            style="width:120px;background:#0f172a;border:2px solid #fbbf24;border-radius:6px;padding:8px 12px;color:#fff;font-size:16px;font-weight:700;text-align:center"
+            oninput="updatePPCalc()">
+          <span style="font-size:12px;color:#64748b">million</span>
+        </div>
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:6px">② Deposit Base ($B)</label>
+        <input type="range" id="pp-calc-deposits" min="${depMin}" max="${depMax}" value="${depDefault}" step="${depStep}"
+          style="width:100%;accent-color:#3b82f6;cursor:pointer"
+          oninput="updatePPCalc()">
+        <div style="display:flex;justify-content:space-between;margin-top:4px">
+          <span style="font-size:10px;color:#475569">${depLabel(depMin)}</span>
+          <span style="font-size:13px;font-weight:700;color:#60a5fa" id="pp-calc-dep-label">${depLabel(depDefault)}</span>
+          <span style="font-size:10px;color:#475569">${depLabel(depMax)}</span>
+        </div>
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:6px">③ Deposit Cost Improvement (bps)</label>
+        <input type="range" id="pp-calc-bps" min="1" max="10" value="1" step="1"
+          style="width:100%;accent-color:#34d399;cursor:pointer"
+          oninput="updatePPCalc()">
+        <div style="display:flex;justify-content:space-between;margin-top:4px">
+          <span style="font-size:10px;color:#475569">1bp</span>
+          <span style="font-size:13px;font-weight:700;color:#34d399" id="pp-calc-bps-label">1bp</span>
+          <span style="font-size:10px;color:#475569">10bps</span>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:6px">Quick Scenarios</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap" id="pp-calc-scenarios"></div>
+      </div>
+    </div>
+    <div>
+      <div style="background:#0f172a;border-radius:12px;padding:20px;border:1px solid #334155;text-align:center;margin-bottom:12px">
+        <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Annual NII Improvement</div>
+        <div style="font-size:52px;font-weight:700;color:#34d399;line-height:1" id="pp-calc-result">—</div>
+        <div style="font-size:12px;color:#64748b;margin-top:6px" id="pp-calc-breakdown">Adjust sliders above</div>
+      </div>
+      <div style="background:#0f172a;border-radius:12px;padding:16px;border:1px solid #334155;text-align:center;margin-bottom:12px">
+        <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Return on Curinos Investment</div>
+        <div style="font-size:32px;font-weight:700;color:#60a5fa;line-height:1" id="pp-calc-roi">—</div>
+        <div style="font-size:10px;color:#475569;margin-top:4px">annual NII improvement vs. your contract value</div>
+      </div>
+      <div style="background:rgba(16,185,129,0.1);border-radius:8px;padding:12px;border:1px solid rgba(16,185,129,0.25);text-align:center">
+        <div style="font-size:12px;font-weight:700;color:#34d399" id="pp-calc-payback">Enter contract value to see payback period</div>
+      </div>
+    </div>
+  </div>
+</div>`;
+}
+
+function updatePPCalc(){
+  const dep=parseFloat(document.getElementById('pp-calc-deposits')?.value)||50;
+  const bps=parseFloat(document.getElementById('pp-calc-bps')?.value)||1;
+  const contractRaw=document.getElementById('pp-calc-contract')?.value;
+  const contractCostM=contractRaw&&contractRaw!==''?parseFloat(contractRaw):null;
+  const fmt=(n)=>{if(n>=1e9)return'$'+(n/1e9).toFixed(2)+'B';if(n>=1e6)return'$'+Math.round(n/1e6)+'M';return'$'+(n/1e3).toFixed(0)+'K';};
+  const fmtDep=(v)=>v<1?'$'+(v*1000).toFixed(0)+'M':v<1000?'$'+v.toLocaleString()+'B':'$'+(v/1000).toFixed(2)+'T';
+  // Annual NII: dep (in B) * bps / 10000 * 1e9 = dep * bps * 1e5
+  const annualNII=dep*bps*1e5;
+  const depLbl=document.getElementById('pp-calc-dep-label');
+  const bpsLbl=document.getElementById('pp-calc-bps-label');
+  if(depLbl)depLbl.textContent=fmtDep(dep);
+  if(bpsLbl)bpsLbl.textContent=bps+'bp'+(bps>1?'s':'');
+  const res=document.getElementById('pp-calc-result');
+  if(res)res.textContent=fmt(annualNII);
+  const breakdown=document.getElementById('pp-calc-breakdown');
+  if(breakdown)breakdown.textContent=bps+'bp'+(bps>1?'s':'')+' on '+fmtDep(dep)+' deposit base';
+  const roiEl=document.getElementById('pp-calc-roi');
+  const paybackEl=document.getElementById('pp-calc-payback');
+  if(contractCostM&&contractCostM>0){
+    const contractN=contractCostM*1e6;
+    const multiple=Math.round(annualNII/contractN);
+    if(roiEl)roiEl.textContent=multiple+'x return';
+    const days=Math.round((contractN/annualNII)*365);
+    if(paybackEl){
+      if(days<1)paybackEl.textContent='Pays for itself in hours of NII improvement';
+      else if(days<7)paybackEl.textContent='Pays for itself in '+days+' day'+(days>1?'s':'')+' of NII improvement';
+      else if(days<30)paybackEl.textContent='Pays for itself in ~'+Math.ceil(days/7)+' week'+(Math.ceil(days/7)>1?'s':'')+' of NII improvement';
+      else paybackEl.textContent='Pays for itself in ~'+Math.ceil(days/30)+' month'+(Math.ceil(days/30)>1?'s':'')+' of NII improvement';
+    }
+  } else {
+    if(roiEl)roiEl.textContent='—';
+    if(paybackEl)paybackEl.textContent='Enter contract value to see payback period';
+  }
+}
+
+// ── TAB 8: RECENT NEWS ────────────────────────────────────────────────────
+function news(){
+  const n=D.news||{};
+  const items=n.items||[];
+  const analystRatings=n.analystRatings||[];
+  const keyThemes=n.keyThemes||[];
+  const earningsQA=n.earningsQA||[];
+  const articles=n.articles||[];
+  const salesTiming=n.salesTiming||{};
+
+  // ── NEWS CARDS ──────────────────────────────────────────────────────
+  const tagLabelMap={earnings:"Earnings",strategy:"Strategy",digital:"Digital",partnership:"Partnership",risk:"Risk"};
+  const tagColourMap={earnings:"#34d399",strategy:"#60a5fa",digital:"#a78bfa",partnership:"#fbbf24",risk:"#f87171"};
+  const tagBgMap={earnings:"rgba(16,185,129,0.08)",strategy:"rgba(59,130,246,0.08)",digital:"rgba(168,85,247,0.08)",partnership:"rgba(245,158,11,0.08)",risk:"rgba(248,113,113,0.08)"};
+  const itemsHtml=items.map(item=>{
+    const tag=item.tag||"strategy";
+    const borderC=tagColourMap[tag]||"#60a5fa";
+    const bgC=tagBgMap[tag]||"rgba(59,130,246,0.08)";
+    const tagLabel=tagLabelMap[tag]||(tag.charAt(0).toUpperCase()+tag.slice(1));
+    return`<div class="news-card" style="border-left:3px solid ${borderC};background:${bgC};margin-bottom:12px;padding:14px;border-radius:8px">
+<div class="news-meta" style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+  <span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;background:${bgC};border:1px solid ${borderC};color:${borderC};text-transform:uppercase">${tagLabel}</span>
+  ${item.date?`<span style="font-size:10px;color:#64748b">${item.date}</span>`:""}
+  ${item.source?`<span style="font-size:10px;color:#475569">· ${item.source}</span>`:""}
+  ${item.url?`<a href="${item.url}" target="_blank" rel="noopener" style="font-size:10px;color:#60a5fa;text-decoration:none;margin-left:auto">↗ View source</a>`:""}
+</div>
+<div style="font-size:13px;font-weight:700;color:#f8fafc;line-height:1.4;margin-bottom:6px">${item.title||item.headline||""}</div>
+<div style="font-size:11px;color:#94a3b8;line-height:1.6">${item.body||item.summary||""}</div>
+${item.quote?`<div style="margin-top:10px;background:rgba(59,130,246,0.08);border-left:3px solid #60a5fa;padding:12px;border-radius:6px"><div style="font-size:11px;font-weight:700;color:#60a5fa;margin-bottom:4px">💬 ${item.quoteAttrib||"Quote"}:</div><div style="font-size:11px;color:#cbd5e1;line-height:1.6;font-style:italic">"${item.quote}"</div></div>`:""}
+${item.salesAngle?`<div style="margin-top:10px;background:rgba(245,158,11,0.06);border-left:3px solid #fbbf24;padding:10px;border-radius:6px"><div style="font-size:11px;font-weight:700;color:#fbbf24;margin-bottom:4px">🎯 SALES ANGLE:</div><div style="font-size:11px;color:#94a3b8;line-height:1.6">${item.salesAngle}</div></div>`:""}
+</div>`;
+  }).join("");
+
+  // ── ANALYST RATINGS: Consensus header + individual cards ──────────
+  let analystHtml="";
+  if(analystRatings.length){
+    const bullCount=analystRatings.filter(r=>["Buy","Overweight","Outperform","Strong Buy"].includes(r.rating)).length;
+    const holdCount=analystRatings.filter(r=>["Hold","Equal-Weight","Neutral","Market Perform"].includes(r.rating)).length;
+    const bearCount=analystRatings.filter(r=>["Sell","Underweight","Underperform"].includes(r.rating)).length;
+    const targets=analystRatings.filter(r=>r.target&&/[0-9]/.test(r.target)).map(r=>parseFloat(r.target.replace(/[^0-9.]/g,""))).filter(v=>!isNaN(v));
+    const avgTarget=targets.length?(targets.reduce((a,b)=>a+b,0)/targets.length).toFixed(0):"";
+    const consensusLabel=bullCount>=(analystRatings.length*0.6)?"Overweight":holdCount>=(analystRatings.length*0.6)?"Equal-Weight":"Mixed";
+    const consensusCol=bullCount>=(analystRatings.length*0.6)?"#34d399":"#fbbf24";
+
+    const ratingCards=analystRatings.map(r=>{
+      const isBull=["Buy","Overweight","Outperform","Strong Buy"].includes(r.rating);
+      const isBear=["Sell","Underweight","Underperform"].includes(r.rating);
+      const rCol=isBull?"#34d399":isBear?"#f87171":"#94a3b8";
+      const rBg=isBull?"rgba(16,185,129,0.1)":isBear?"rgba(248,113,113,0.1)":"rgba(100,116,139,0.1)";
+      const dirIcon=r.direction==="up"?"▲ ":r.direction==="down"?"▼ ":"— ";
+      const dirCol=r.direction==="up"?"#34d399":r.direction==="down"?"#f87171":"#94a3b8";
+      return`<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+  <div>
+    <div style="font-size:12px;font-weight:700;color:#fff">${r.firm}</div>
+    <div style="font-size:10px;color:#64748b;margin-top:2px">${r.analyst||""} · ${r.date||""}</div>
+  </div>
+  <div style="text-align:right">
+    <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:6px;background:${rBg};color:${rCol}">${r.rating}</span>
+    ${r.target?`<div style="font-size:13px;font-weight:700;color:${dirCol};margin-top:4px">${dirIcon}${r.target}</div>`:""}
+  </div>
+</div>
+${r.note?`<div style="font-size:11px;color:#94a3b8;line-height:1.5">${r.note}</div>`:""}
+${r.url?`<a href="${r.url}" target="_blank" rel="noopener" style="font-size:10px;color:#60a5fa;text-decoration:none;display:inline-block;margin-top:6px">↗ View source</a>`:""}
+</div>`;
+    }).join("");
+
+    analystHtml=`<div id="n-ratings" class="section-anchor"></div>
+<div class="ib ib-b"><div class="ibt">📊 Analyst Intelligence — ${D.basic.name}</div>
+<p style="font-size:12px;color:#94a3b8">Analyst ratings and commentary sourced from public research notes and earnings call transcripts. Individual analyst price targets and ratings are indicative  verify current consensus on Bloomberg or FactSet before client meetings.</p></div>
+<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px;margin-bottom:16px">
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px">
+    <div style="text-align:center"><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Consensus Rating</div><div style="font-size:18px;font-weight:700;color:${consensusCol}">${consensusLabel}</div><div style="font-size:10px;color:#64748b;margin-top:4px">Majority buy-side view</div></div>
+    <div style="text-align:center"><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Avg. Price Target</div><div style="font-size:18px;font-weight:700;color:#f8fafc">~$${avgTarget}</div><div style="font-size:10px;color:#64748b;margin-top:4px">Across ${analystRatings.length} analyst firms</div></div>
+    <div style="text-align:center"><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Buy / Hold / Sell</div><div style="font-size:18px;font-weight:700;color:#f8fafc">${bullCount} / ${holdCount} / ${bearCount}</div><div style="font-size:10px;color:#64748b;margin-top:4px">Rating distribution</div></div>
+    <div style="text-align:center"><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Implied Upside</div><div style="font-size:18px;font-weight:700;color:#34d399">${n.currentPrice&&avgTarget!==""?"~+"+(((parseFloat(avgTarget)-parseFloat(n.currentPrice.replace(/[^0-9.]/g,"")))/parseFloat(n.currentPrice.replace(/[^0-9.]/g,"")))*100).toFixed(0)+"%":"N/A"}</div><div style="font-size:10px;color:#64748b;margin-top:4px">To consensus target</div></div>
+  </div>
+  ${n.consensusNote?`<div style="font-size:11px;color:#64748b;border-top:1px solid #1e293b;padding-top:10px;margin-top:4px">⚠ ${n.consensusNote}</div>`:""}
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:16px">${ratingCards}</div>`;
+  }
+
+  // ── ANALYST KEY THEMES ──────────────────────────────────────────────
+  let themesHtml="";
+  if(keyThemes.length){
+    const themeCards=keyThemes.map(t=>`<div style="background:#0f172a;border:1px solid #334155;border-left:3px solid ${t.colour||"#60a5fa"};border-radius:8px;padding:14px">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+  <div style="display:flex;align-items:center;gap:8px"><span style="font-size:16px">${t.icon||"📌"}</span><span style="font-size:13px;font-weight:700;color:#fff">${t.theme}</span></div>
+  <span style="font-size:9px;padding:2px 8px;border-radius:10px;font-weight:700;background:rgba(245,158,11,0.15);color:#fbbf24;white-space:nowrap">${t.urgency||""}</span>
+</div>
+<div style="font-size:11px;color:#94a3b8;line-height:1.6;margin-bottom:8px">${t.detail||""}</div>
+${t.salesAngle?`<div style="background:rgba(245,158,11,0.06);border-left:2px solid #fbbf24;padding:8px;border-radius:4px;font-size:11px;color:#94a3b8;line-height:1.5"><span style="font-weight:700;color:#fbbf24">🎯 Sales Angle: </span>${t.salesAngle}</div>`:""}
+${t.url?`<a href="${t.url}" target="_blank" rel="noopener" style="font-size:10px;color:#60a5fa;text-decoration:none;display:inline-block;margin-top:6px">↗ ${t.source||"View source"}</a>`:""}
+</div>`).join("");
+    themesHtml=`<div id="n-themes-analyst" class="section-anchor"></div>
+<div class="ib ib-b"><div class="ibt">📈 Key Analyst Themes</div></div>
+<div style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px">${themeCards}</div>`;
+  }
+
+  // ── EARNINGS CALL Q&A ─────────────────────────────────────────────
+  let qaHtml="";
+  if(earningsQA.length){
+    const qaItems=earningsQA.map(q=>`<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #1e293b">
+<div style="font-size:11px;font-weight:700;color:#fbbf24;margin-bottom:6px">Q [${q.analyst||"Analyst"}]: ${q.question||q.q||""}</div>
+<div style="font-size:11px;color:#94a3b8;line-height:1.6;margin-bottom:8px">${q.answer||""}</div>
+${q.salesAngle?`<div style="background:rgba(245,158,11,0.06);border-left:2px solid #fbbf24;padding:8px;border-radius:4px;font-size:11px;color:#94a3b8;line-height:1.5"><span style="font-weight:700;color:#fbbf24">🎯 Sales Angle: </span>${q.salesAngle}</div>`:""}
+${q.url?`<a href="${q.url}" target="_blank" rel="noopener" style="font-size:10px;color:#60a5fa;text-decoration:none;display:inline-block;margin-top:6px">↗ ${q.source||"View source"}</a>`:""}
+</div>`).join("");
+    qaHtml=`<div id="n-qa" class="section-anchor"></div>
+<div class="ib ib-b"><div class="ibt">💬 Earnings Call Q&A — Analyst Questions & Management Responses</div>
+<p style="font-size:12px;color:#94a3b8">Key exchanges from the most recent earnings call. Analyst questions signal what management is most scrutinised on  directly informing Curinos positioning.</p></div>
+<div class="panel">${qaItems}</div>`;
+  }
+
+  // ── PRESS COVERAGE ────────────────────────────────────────────────
+  let pressHtml="";
+  if(articles.length){
+    const tagColors={"tag-earn":"#34d399","tag-strat":"#60a5fa","tag-dig":"#a78bfa","tag-risk":"#f87171","tag-pship":"#fbbf24"};
+    const articleCards=articles.map(a=>{
+      const tColor=tagColors[a.tag]||"#60a5fa";
+      return`<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px;margin-bottom:10px">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+  <span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,0.05);border:1px solid ${tColor};color:${tColor};text-transform:uppercase">${a.tagLabel||a.tag||"News"}</span>
+  <span style="font-size:10px;color:#64748b">${a.date||""}</span>
+  <span style="font-size:10px;color:#475569">· ${a.src||a.source||""}</span>
+  ${a.url?`<a href="${a.url}" target="_blank" rel="noopener" style="font-size:10px;color:#60a5fa;text-decoration:none;margin-left:auto">↗ View source</a>`:""}
+</div>
+<div style="font-size:12px;font-weight:700;color:#f8fafc;line-height:1.4;margin-bottom:6px">${a.hl||a.headline||a.title||""}</div>
+<div style="font-size:11px;color:#94a3b8;line-height:1.6">${a.sum||a.summary||a.body||""}</div>
+</div>`;}).join("");
+    pressHtml=`<div id="n-press" class="section-anchor"></div>
+<div class="ib ib-b"><div class="ibt">📰 Press Coverage</div>
+<p style="font-size:12px;color:#94a3b8">Recent press coverage, regulatory filings, and strategic announcements. Sources linked — verify before use in client meetings.</p></div>
+${articleCards}`;
+  }
+
+  // ── SALES TIMING SIGNAL ─────────────────────────────────────────────
+  let timingHtml="";
+  const stWindows=salesTiming.windows||[];
+  if(stWindows.length){
+    const windowCards=stWindows.map(w=>`<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px">
+<div style="font-size:11px;font-weight:700;color:${w.colour||"#fbbf24"};margin-bottom:8px;text-transform:uppercase">${w.label||""}</div>
+<div style="font-size:11px;color:#94a3b8;line-height:1.6">${w.body||""}</div>
+${w.action?`<div style="margin-top:10px;padding:8px;background:rgba(245,158,11,0.06);border-radius:6px;border-left:2px solid #fbbf24;font-size:11px;color:#fbbf24;font-weight:600">${w.action}</div>`:""}
+</div>`).join("");
+    timingHtml=`<div id="n-timing" class="section-anchor"></div>
+<div class="ib ib-a"><div class="ibt">⏳ Sales Timing Signal</div>
+<p style="font-size:12px;color:#94a3b8">${salesTiming.intro||"Current signals and engagement windows for this institution."}</p></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:16px">${windowCards}</div>`;
+  } else if(salesTiming.title){
+    // Legacy fallback for old single-block format
+    const actionsHtml=(salesTiming.actions||[]).map((a,i)=>`${i+1}. <strong style="color:#fff">${a.label}:</strong> ${a.body}<br>`).join("");
+    timingHtml=`<div id="n-timing" class="section-anchor"></div>
+<div class="ib ib-a"><div class="ibt">${salesTiming.title}</div><p>${salesTiming.body||""}</p>
+${actionsHtml?`<div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border-left:3px solid #fbbf24;margin-top:10px"><div style="font-size:11px;font-weight:700;color:#fbbf24;margin-bottom:4px">IMMEDIATE ACTION ITEMS:</div><div style="font-size:10px;color:#94a3b8;line-height:1.7">${actionsHtml}</div></div>`:""}
+</div>`;
+  }
+
+  // Build nav anchors
+  const navItems=[["Latest News","n-news"]];
+  if(analystRatings.length) navItems.push(["Analyst Ratings","n-ratings"]);
+  if(keyThemes.length) navItems.push(["Analyst Themes","n-themes-analyst"]);
+  if(earningsQA.length) navItems.push(["Earnings Call Q&A","n-qa"]);
+  if(articles.length) navItems.push(["Press Coverage","n-press"]);
+  if(stWindows.length||salesTiming.title) navItems.push(["Sales Timing","n-timing"]);
+
+  return anav(navItems) +
+  `<div id="n-news" class="section-anchor"></div>
+<div class="ib ib-g"><div class="ibt">${n.headline||("Latest News — "+D.basic.name)}</div><p>${n.intro||""}</p></div>
+<div class="panel">${itemsHtml||"<p style='color:#64748b'>No recent news items added.</p>"}</div>` +
+  analystHtml + themesHtml + qaHtml + pressHtml + timingHtml;
+}
+
+
+// ── COPY BRIEF ───────────────────────────────────────────────────────────
+function copyBrief(){
+  const sp=D.salesPlaybook||{};
+  const p1=(D.products||[]).filter(p=>p.pri===1).slice(0,3).map((p,i)=>`${i+1}. ${p.name} (Fit: ${p.fit||''}%) — ${(p.need||p.why||'').slice(0,120)}...`).join('\n');
+  const execs=(D.contacts&&D.contacts.execs||[]).slice(0,4).map(e=>`- ${e.name} — ${e.title}`).join('\n');
+  const metrics=(D.metrics||[]).slice(0,8).map(m=>`- ${m.l}: ${m.v} (${m.tr||''})`).join('\n');
+  const timing=(D.news&&D.news.salesTiming&&D.news.salesTiming.windows||[]).map(w=>`${w.label}: ${w.body&&w.body.slice(0,100)}...`).join('\n');
+  const hook=sp.valueProps&&sp.valueProps[0]?sp.valueProps[0].pitch:'';
+  const brief=`${(D.basic&&D.basic.name||'INSTITUTION').toUpperCase()} — CURINOS SALES BRIEF
+Generated: ${new Date().toLocaleDateString()}
+Opportunity: ${D.meta&&D.meta.opportunity||''} — ${D.meta&&D.meta.opportunityRationale||''}
+
+KEY METRICS
+${metrics}
+
+TOP P1 PRODUCTS
+${p1}
+
+SALES STRATEGY
+${sp.intro||D.curinosAngle&&D.curinosAngle.body||''}
+
+KEY CONTACTS
+${execs}
+
+OPENING HOOK
+${hook}
+
+SALES TIMING
+${timing}
+
+IR WEBSITE: ${D.basic&&D.basic.ir_url||D.basic&&D.basic.website||''}`;
+  navigator.clipboard.writeText(brief).then(()=>{
+    const btn=document.getElementById('copyBriefBtn');
+    if(btn){btn.textContent='✓ Copied!';setTimeout(()=>{btn.textContent=' Copy 1-Page Brief';},2500);}
+  }).catch(()=>alert('Copy failed  please copy manually.'));
+}
+
+// ── CHART SETUP ───────────────────────────────────────────────────────────
+function setupFinCharts(){
+  const ch=D.charts||{};const bs=ch.balanceSheet||{};const rv=ch.revenue||{};
+  const bCtx=document.getElementById("balanceChart");
+  if(bCtx&&bs.labels){
+    // Auto-detect scale: if max asset value < 2 assume $B (large bank), otherwise $M (community bank)
+    const bsMax=Math.max(...(bs.assets||[0]));
+    const bsUnit=bsMax<2?"B":"M";
+    const bsFmt=v=>"$"+v+(bsUnit==="B"?"B":"M");
+    charts.balance=new Chart(bCtx,{type:"line",data:{labels:bs.labels,datasets:[{label:"Total Assets ($"+bsUnit+")",data:bs.assets,borderColor:"#3b82f6",backgroundColor:"rgba(59,130,246,0.1)",tension:0.3,fill:true},{label:"Total Loans ($"+bsUnit+")",data:bs.loans,borderColor:"#10b981",backgroundColor:"rgba(16,185,129,0.1)",tension:0.3,fill:true},{label:"Total Deposits ($"+bsUnit+")",data:bs.deposits,borderColor:"#f59e0b",backgroundColor:"rgba(245,158,11,0.1)",tension:0.3,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:"#e2e8f0",padding:15,font:{size:12}}},tooltip:{callbacks:{label:function(c){return c.dataset.label+": $"+c.parsed.y+bsUnit}}}},scales:{y:{beginAtZero:false,ticks:{color:"#94a3b8",callback:function(v){return bsFmt(v)}},grid:{color:"rgba(255,255,255,0.05)"}},x:{ticks:{color:"#94a3b8"},grid:{color:"rgba(255,255,255,0.05)"}}}}});}
+  const rCtx=document.getElementById("revenueChart");
+  if(rCtx&&rv.labels){
+    // Auto-detect scale: if max NII value < 2 assume $B, otherwise $M
+    const rvMax=Math.max(...(rv.nii||[0]));
+    const rvUnit=rvMax<2?"B":"M";
+    const rvFmt=v=>"$"+v+(rvUnit==="B"?"B":"M");
+    charts.revenue=new Chart(rCtx,{type:"bar",data:{labels:rv.labels,datasets:[{label:"Net Interest Income ($"+rvUnit+")",data:rv.nii,backgroundColor:"#3b82f6"},{label:"Non-Interest Income ($"+rvUnit+")",data:rv.nonii,backgroundColor:"#10b981"}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:"#e2e8f0",padding:15,font:{size:12}}},tooltip:{callbacks:{label:function(c){return c.dataset.label+": $"+c.parsed.y+rvUnit}}}},scales:{y:{stacked:true,ticks:{color:"#94a3b8",callback:function(v){return rvFmt(v)}},grid:{color:"rgba(255,255,255,0.05)"}},x:{stacked:true,ticks:{color:"#94a3b8"},grid:{color:"rgba(255,255,255,0.05)"}}}}});}
+}
+
+function setupLoanCharts(){
+  const pCtx=document.getElementById("loanPieChart");
+  const mix=(D.loans&&D.loans.mix)||[];
+  if(pCtx&&mix.length){
+    const colours=["#3b82f6","#10b981","#f59e0b","#a855f7","#ef4444","#06b6d4","#fb923c","#14b8a6"];
+    charts.loanPie=new Chart(pCtx,{type:"doughnut",data:{labels:mix.map(m=>m.label+" ("+m.pct+"%)"),datasets:[{data:mix.map(m=>m.pct),backgroundColor:colours.slice(0,mix.length),borderWidth:2,borderColor:"#1e293b"}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{color:"#e2e8f0",padding:12,font:{size:11}}},tooltip:{callbacks:{label:function(c){const v=c.parsed;return c.label+": est."+(D.loans.totalLoansB?" ($"+(v/100*D.loans.totalLoansB).toFixed(1)+"B)":"");}}}}}}  );}
+}
+
+function setupPeerCharts(){
+  const peerKey=Object.keys(D.peers||{})[0]||"regionals";
+  const rows=D.peers[peerKey]||[];
+  if(!rows.length)return;
+  const safeNum=v=>{if(v===null||v===undefined)return NaN;return parseFloat(String(v).replace(/[~$%,\s]/g,''));};
+  const nimCtx=document.getElementById("nimTrendChart");
+  if(nimCtx){
+    const nt=D.nimTrend||{};
+    const legacyNimTrend=D.peers.nimTrend||[];
+    if(nt.labels&&nt.target&&nt.target.length){
+      const datasets=[{label:rows[0].n,data:nt.target,borderColor:"#3b82f6",backgroundColor:"rgba(59,130,246,0.08)",tension:0.3,borderWidth:3,fill:false,pointRadius:4,pointBackgroundColor:"#3b82f6"}];
+      const peerColours=["#94a3b8","#64748b","#475569","#10b981","#f59e0b"];
+      Object.entries(nt.peers||{}).forEach(([name,vals],i)=>{datasets.push({label:name,data:vals,borderColor:peerColours[i%peerColours.length],backgroundColor:"transparent",tension:0.3,borderWidth:1.5,borderDash:[4,4],pointRadius:2,pointBackgroundColor:peerColours[i%peerColours.length]});});
+      const _nimAllVals=[...(nt.target||[]),...Object.values(nt.peers||{}).flat()].filter(v=>v>0);const _nimMin=_nimAllVals.length?Math.max(0,Math.min(..._nimAllVals)-0.3):2;const _nimMax=_nimAllVals.length?Math.max(..._nimAllVals)+0.3:5;
+      charts.nimTrend=new Chart(nimCtx,{type:"line",data:{labels:nt.labels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:"#e2e8f0",font:{size:10},padding:10}}},scales:{y:{suggestedMin:_nimMin,suggestedMax:_nimMax,ticks:{color:"#94a3b8",callback:v=>v.toFixed(2)+"%"},grid:{color:"rgba(255,255,255,0.05)"}},x:{ticks:{color:"#94a3b8"},grid:{color:"rgba(255,255,255,0.05)"}}}}});
+    } else if(legacyNimTrend.length){
+      const colours=["#3b82f6","#10b981","#f59e0b","#a855f7","#ef4444","#06b6d4"];
+      const datasets=legacyNimTrend.map((series,i)=>({label:series.name,data:series.values,borderColor:colours[i%colours.length],backgroundColor:"transparent",tension:0.3,borderWidth:series.name===rows[0].n?3:1.5,borderDash:series.name===rows[0].n?[]:[4,4],pointRadius:series.name===rows[0].n?4:2,pointBackgroundColor:colours[i%colours.length]}));
+      const _legacyVals=legacyNimTrend.flatMap(s=>s.values||[]).filter(v=>v>0);const _legMin=_legacyVals.length?Math.max(0,Math.min(..._legacyVals)-0.3):2;const _legMax=_legacyVals.length?Math.max(..._legacyVals)+0.3:5;
+      charts.nimTrend=new Chart(nimCtx,{type:"line",data:{labels:legacyNimTrend[0]?.quarters||[],datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:"#e2e8f0",font:{size:10},padding:10}}},scales:{y:{suggestedMin:_legMin,suggestedMax:_legMax,ticks:{color:"#94a3b8",callback:v=>v.toFixed(2)+"%"},grid:{color:"rgba(255,255,255,0.05)"}},x:{ticks:{color:"#94a3b8"},grid:{color:"rgba(255,255,255,0.05)"}}}}});
+    }
+  }
+  const radarMetrics=D.peers.radarMetrics||[];
+  const radarCtx=document.getElementById("radarChart");
+  if(radarCtx&&rows.length>=2){
+    if(radarMetrics.length){
+      const labels=radarMetrics.map(m=>m.label);
+      charts.radar=new Chart(radarCtx,{type:"radar",data:{labels,datasets:[{label:rows[0].n,data:radarMetrics.map(m=>m.targetScore||50),borderColor:"#3b82f6",backgroundColor:"rgba(59,130,246,0.15)",pointBackgroundColor:"#3b82f6"},{label:"Peer Avg",data:radarMetrics.map(m=>m.peerScore||50),borderColor:"#ef4444",backgroundColor:"rgba(239,68,68,0.1)",pointBackgroundColor:"#ef4444"}]},options:{responsive:true,maintainAspectRatio:false,scales:{r:{ticks:{display:false},grid:{color:"rgba(255,255,255,0.1)"},pointLabels:{color:"#94a3b8",font:{size:10}}}},plugins:{legend:{labels:{color:"#e2e8f0",font:{size:11}}}}}});
+    } else {
+      const keys=["nim","cet1","roaa","dep_cost","eff"];
+      const labels2=["NIM","CET1","ROAA","Dep.Cost","Efficiency"];
+      const lowerBetter=["dep_cost","eff"];
+      const normalize=(key,val,allRows)=>{
+        const nums=allRows.map(r=>safeNum(r[key])).filter(v=>!isNaN(v));
+        if(!nums.length)return 50;
+        const mn=Math.min(...nums),mx=Math.max(...nums);
+        const v=safeNum(val);if(isNaN(v))return 50;
+        if(mx===mn)return 50;
+        const raw=((v-mn)/(mx-mn))*100;
+        return lowerBetter.includes(key)?100-raw:raw;
+      };
+      const tVals=keys.map(k=>Math.round(normalize(k,rows[0][k],rows)));
+      const peerRows=rows.slice(1);
+      const pVals=keys.map(k=>{const ns=peerRows.map(r=>normalize(k,r[k],rows)).filter(v=>!isNaN(v));return ns.length?Math.round(ns.reduce((a,b)=>a+b,0)/ns.length):50;});
+      charts.radar=new Chart(radarCtx,{type:"radar",data:{labels:labels2,datasets:[{label:rows[0].n,data:tVals,borderColor:"#3b82f6",backgroundColor:"rgba(59,130,246,0.15)",pointBackgroundColor:"#3b82f6",borderWidth:2},{label:"Peer Avg",data:pVals,borderColor:"#475569",backgroundColor:"rgba(71,85,105,0.1)",borderDash:[5,5],borderWidth:1.5,pointBackgroundColor:"#475569"}]},options:{responsive:true,maintainAspectRatio:false,scales:{r:{ticks:{display:false},grid:{color:"rgba(255,255,255,0.08)"},pointLabels:{color:"#94a3b8",font:{size:11}},angleLines:{color:"rgba(255,255,255,0.08)"}}},plugins:{legend:{labels:{color:"#94a3b8",font:{size:11}}}}}});
+    }
+  }
+}
+
+function setPPCalc(deps, bps){
+  const depEl=document.getElementById("pp-calc-deposits");
+  const bpsEl=document.getElementById("pp-calc-bps");
+  if(depEl){depEl.value=deps;}
+  if(bpsEl){bpsEl.value=bps;}
+  updatePPCalc();
+}
+
+function setupCalcScenarios(){
+  const scenDiv=document.getElementById('pp-calc-scenarios');
+  if(!scenDiv) return;
+  // Build deposit-scaled scenario buttons
+  const deps=D.loans&&D.loans.totalLoansB?Math.round(D.loans.totalLoansB*1.3):50;
+  const scenarios=[
+    {label:'1bp on full base',d:deps,b:1},
+    {label:'2bps (conservative)',d:deps,b:2},
+    {label:'5bps (typical)',d:deps,b:5}
+  ];
+  // Add segment-specific scenarios if we can derive them
+  const totalDep=parseFloat((((D.metrics||[]).find(m=>m.l&&m.l.toLowerCase().includes('deposit')))||{}).v||'0');
+  const consumerDep=Math.round(deps*0.45);
+  const commDep=Math.round(deps*0.30);
+  if(consumerDep>0) scenarios.push({label:'Consumer only (~'+Math.round(consumerDep)+'B)',d:consumerDep,b:1});
+  if(commDep>0) scenarios.push({label:'Commercial only (~'+Math.round(commDep)+'B)',d:commDep,b:1});
+  scenDiv.innerHTML=scenarios.map(s=>`<button onclick="setPPCalc(${s.d},${s.b})" style="font-size:10px;padding:4px 10px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#94a3b8;cursor:pointer;margin-bottom:4px">${s.label}</button>`).join('');
+}
+
+initBankBar();
+rt();rc();
+setupCalcScenarios();
+</script>
+</body>
+</html>
