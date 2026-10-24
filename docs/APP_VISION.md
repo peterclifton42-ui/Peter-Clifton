@@ -203,12 +203,17 @@ These are the gaps that will decide whether the app makes sense to a seller. Eac
 4. **Create two free accounts** (I'll walk you through each screen when we get there): **Vercel** (sign up with your GitHub account), and confirm which **Supabase** organisation to use (you already have Supabase connected).
 5. **Anthropic API account**: decide whether it's yours or Curinos's. Not needed until Phase 3.
 
-### Starter questions
-1. Roughly how many sellers will use it at first: 5, 20, 100?
-2. Personal pilot first (your accounts and budget) or Curinos-sanctioned from day one?
-3. Does Curinos use Microsoft 365 / Outlook sign-in for staff? (That decides SSO.)
-4. Should credit unions sit alongside banks everywhere, or in their own section?
-5. Which 5 metrics matter most to a seller when comparing peers?
-6. ~~Do you have the Curinos product list handy?~~ Done: Catalogue V4 is in `reference/`. The build files, scorer, page templates and FDIC benchmark are now in `reference/` too.
-7. Notifications: email, in-app only, or both? Instant, or a weekly digest?
-8. Should the Run A / Run B pipeline stay paused until it can write to the app?
+### Decisions (24 Oct 2026)
+| Question | Decision |
+|---|---|
+| Pilot size | About 20 sellers |
+| Pilot type | Personal pilot first (your own accounts and budget) |
+| Login | Email and password, accounts created by an admin; no self sign-up |
+| Credit unions | Alongside banks everywhere, with a filter |
+| Default peer metrics | NIM, deposit cost, loan-to-deposit (loan-to-share for CUs), deposit growth, efficiency ratio. **Later:** let each seller pick their own metrics |
+| Notifications | Both in-app and email, with a weekly email digest |
+| Run A / Run B | Stay paused until the pipeline writes to the app (Phase 3) |
+
+### Phase 1 status
+Built: login, admin screen (create logins with a temporary password, change roles, reset passwords, remove users), bank directory with search and filters, and bank pages showing the existing dashboards. All 58 published dashboards are loaded into Supabase (`bank-intelligence` project), and every one renders with the current page template.
+Note for later: with ~20 sellers, Supabase's built-in email can't send password resets (it only emails the project owner). Admins reset passwords from the admin screen until an email service (Resend) is added in Phase 4.
