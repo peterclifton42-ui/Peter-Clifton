@@ -10,7 +10,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Link href="/" className="brand">Bank Intelligence</Link>
         {viewer.role !== "pending" && (
           <nav className="nav">
-            <Link href="/">Banks</Link>
+            <Link href="/">Home</Link>
+            <Link href="/banks">Banks</Link>
+            <Link href="/calendar">Calendar</Link>
             {viewer.role === "admin" && <Link href="/admin">Admin</Link>}
           </nav>
         )}
