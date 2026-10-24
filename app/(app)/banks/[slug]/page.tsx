@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { requireViewer } from "@/lib/auth";
 import { renderDashboard } from "@/lib/dashboard";
+import { EVENT_COLUMNS, formatDay, latestAndNext, needsRefresh, todayISO, type EarningsEvent } from "@/lib/earnings";
+import { followedSlugs } from "@/lib/follows";
 import { categoryLabel, formatAssets, shortQuarter, INSTITUTION_COLUMNS, type Institution } from "@/lib/institutions";
 import { createClient } from "@/lib/supabase/server";
+import { FollowButton } from "../../follow-button";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -28,25 +32,34 @@ export default async function BankPage({ params }: Props) {
   const institution = await loadInstitution(slug);
   if (!institution?.current_snapshot_id) notFound();
 
+  const viewer = await requireViewer();
   const supabase = await createClient();
-  const { data: snapshot } = await supabase
-    .from("snapshots")
-    .select("data, loaded_at")
-    .eq("id", institution.current_snapshot_id)
-    .single();
+  const [{ data: snapshot }, { data: events }, followed] = await Promise.all([
+    supabase.from("snapshots").select("data, loaded_at").eq("id", institution.current_snapshot_id).single(),
+    supabase.from("earnings_events").select(EVENT_COLUMNS).eq("slug", slug),
+    followedSlugs(viewer.id),
+  ]);
   if (!snapshot) notFound();
+  const { latest, next } = latestAndNext((events ?? []) as EarningsEvent[], todayISO()).get(slug) ?? {};
+  const outOfDate = latest && needsRefresh(latest, snapshot.loaded_at);
 
   const html = await renderDashboard(snapshot.data);
 
   return (
     <>
       <div className="bank-bar">
-        <Link href="/">← All banks</Link>
+        <Link href="/banks">← All banks</Link>
+        <FollowButton slug={slug} name={institution.name} following={followed.has(slug)} />
         <span className="meta">
           {categoryLabel(institution.category)} · {formatAssets(institution.assets_b)} assets · data to{" "}
           {shortQuarter(institution.latest_quarter)} · researched{" "}
           {new Date(snapshot.loaded_at).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
         </span>
+        {outOfDate ? (
+          <span className="badge medium">{latest.period} results out {formatDay(latest.event_date)} · not yet in this dashboard</span>
+        ) : next ? (
+          <span className="meta">Next results {formatDay(next.event_date)}{next.status === "estimated" ? " (estimated)" : ""}</span>
+        ) : null}
       </div>
       {/* The dashboard runs in a sandbox with no access to this page or the login session. */}
       <iframe

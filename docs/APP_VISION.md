@@ -217,3 +217,15 @@ These are the gaps that will decide whether the app makes sense to a seller. Eac
 ### Phase 1 status
 Built: login, admin screen (create logins with a temporary password, change roles, reset passwords, remove users), bank directory with search and filters, and bank pages showing the existing dashboards. All 58 published dashboards are loaded into Supabase (`bank-intelligence` project), and every one renders with the current page template.
 Note for later: with ~20 sellers, Supabase's built-in email can't send password resets (it only emails the project owner). Admins reset passwords from the admin screen until an email service (Resend) is added in Phase 4.
+
+### Phase 2 status (24 Oct 2026)
+Built:
+- **Follow ☆** on every bank (directory rows, bank pages, home cards), with a "Following only" filter.
+- **Home page ("Your briefing")**: a card per followed bank showing type, size, opportunity, the dashboard's sales theme, the top three recommended products and its results status. There's also a list of who reports in the next two weeks, and of every bank whose results came out after its dashboard was researched. Anyone following nothing sees six high-opportunity suggestions.
+- **Earnings calendar** (`/calendar`): 30 days back to five months ahead, grouped by week, All or Following. Shows each event's status (Reported / Confirmed / Estimated), an "out of date" flag and a source link.
+- **Bank page** now shows the follow button and either the next results date or a "results out, not yet in this dashboard" warning.
+
+Data: `earnings_events` holds Q3 2026 and Q4 2026 dates for all 58 institutions. The Q3 dates were checked against each company's own announcement or SEC filing on 24 Oct 2026. Four are estimates: Bank of Hawaii, TowneBank and Banc of California hadn't confirmed a date, and Q4 dates are projected 13 weeks on from Q3. Credit unions use NCUA's quarterly data release and the two private banks use FFIEC call reports, both estimated. Phase 3 should take over keeping these dates current.
+
+Finding: on 24 Oct, 34 of the 58 dashboards are already behind the latest published results (Q3 2026 out, dashboard still Q2). That is the case for Phase 3's automatic refresh.
+

@@ -1,30 +1,155 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { requireViewer } from "@/lib/auth";
+import {
+  addDays, EVENT_COLUMNS, formatDay, latestAndNext, needsRefresh, todayISO, type EarningsEvent,
+} from "@/lib/earnings";
+import { followedSlugs } from "@/lib/follows";
+import { categoryLabel, formatAssets, INSTITUTION_COLUMNS, shortQuarter, type Institution } from "@/lib/institutions";
 import { createClient } from "@/lib/supabase/server";
-import { INSTITUTION_COLUMNS, type Institution } from "@/lib/institutions";
-import { Directory } from "./directory";
+import { FollowButton } from "./follow-button";
 
-export const metadata: Metadata = { title: "Banks" };
+export const metadata: Metadata = { title: "Home" };
 
-export default async function DirectoryPage() {
+type Summary = { slug: string; sales_theme: string | null; lead_products: string[]; researched_at: string };
+
+export default async function HomePage() {
+  const viewer = await requireViewer();
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("institutions")
-    .select(INSTITUTION_COLUMNS)
-    .order("assets_b", { ascending: false });
+  const [{ data: institutions }, { data: summaries }, { data: events }, followed] = await Promise.all([
+    supabase.from("institutions").select(INSTITUTION_COLUMNS).order("assets_b", { ascending: false }),
+    supabase.from("institution_summaries").select("slug, sales_theme, lead_products, researched_at"),
+    supabase.from("earnings_events").select(EVENT_COLUMNS).order("event_date"),
+    followedSlugs(viewer.id),
+  ]);
+
+  const today = todayISO();
+  const all = (institutions ?? []) as Institution[];
+  const bySlug = new Map(all.map((i) => [i.slug, i]));
+  const summary = new Map(((summaries ?? []) as Summary[]).map((s) => [s.slug, s]));
+  const evs = (events ?? []) as EarningsEvent[];
+  const timeline = latestAndNext(evs, today);
+
+  const mine = all.filter((i) => followed.has(i.slug));
+  const suggestions = all.filter((i) => i.opportunity === "HIGH").slice(0, 6);
+  const upcoming = evs.filter((e) => e.event_date >= today && e.event_date <= addDays(today, 14) && e.status !== "reported");
+  const stale = evs
+    .filter((e) => needsRefresh(e, summary.get(e.slug)?.researched_at ?? null))
+    .sort((a, b) => b.event_date.localeCompare(a.event_date));
+  const firstName = viewer.fullName?.split(" ")[0];
 
   return (
     <main className="page">
       <div className="page-head">
         <div>
-          <h1>Banks and credit unions</h1>
-          <p>Search or filter, then open an institution to see its full dashboard.</p>
+          <h1>{firstName ? `Hello, ${firstName}` : "Your briefing"}</h1>
+          <p>{formatDay(today)} · what&apos;s happening at the banks you follow, and across the market.</p>
         </div>
       </div>
-      {error ? (
-        <div className="notice error">Couldn&apos;t load the directory: {error.message}</div>
-      ) : (
-        <Directory institutions={(data ?? []) as Institution[]} />
-      )}
+
+      <section className="panel">
+        <h2>Your banks ({mine.length})</h2>
+        {mine.length === 0 ? (
+          <>
+            <p>
+              You&apos;re not following any banks yet. Tap ☆ next to a bank to see it here, with its latest results
+              and what to lead with. Some high-opportunity places to start:
+            </p>
+            <div className="cards">
+              {suggestions.map((i) => (
+                <BankCard key={i.slug} institution={i} summary={summary.get(i.slug)} timeline={timeline.get(i.slug)} following={false} />
+              ))}
+            </div>
+            <p><Link href="/banks">Browse all {all.length} banks and credit unions →</Link></p>
+          </>
+        ) : (
+          <div className="cards">
+            {mine.map((i) => (
+              <BankCard key={i.slug} institution={i} summary={summary.get(i.slug)} timeline={timeline.get(i.slug)} following />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <div className="two-col">
+        <section className="panel">
+          <h2>Reporting in the next two weeks</h2>
+          {upcoming.length === 0 ? <p>No results due in the next 14 days.</p> : (
+            <ul className="event-list">
+              {upcoming.map((e) => {
+                const i = bySlug.get(e.slug);
+                if (!i) return null;
+                return (
+                  <li key={`${e.slug}-${e.period}`} className={followed.has(e.slug) ? "mine" : undefined}>
+                    <span className="when">{formatDay(e.event_date)}</span>
+                    <Link href={`/banks/${e.slug}`}>{i.name}</Link>
+                    {followed.has(e.slug) && <span className="star" aria-label="Following">★</span>}
+                    <span className="dim">{e.period}{e.status === "estimated" ? " · estimated" : ""}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <p><Link href="/calendar">Full earnings calendar →</Link></p>
+        </section>
+
+        <section className="panel">
+          <h2>New results not yet in the dashboard ({stale.length})</h2>
+          <p>These banks have published results since their dashboard was researched, so the figures may be out of date.</p>
+          <ul className="event-list">
+            {stale.slice(0, 10).map((e) => {
+              const i = bySlug.get(e.slug);
+              if (!i) return null;
+              return (
+                <li key={`${e.slug}-${e.period}`} className={followed.has(e.slug) ? "mine" : undefined}>
+                  <span className="when">{formatDay(e.event_date)}</span>
+                  <Link href={`/banks/${e.slug}`}>{i.name}</Link>
+                  {followed.has(e.slug) && <span className="star" aria-label="Following">★</span>}
+                  <span className="dim">{e.period} out · dashboard shows {shortQuarter(i.latest_quarter)}</span>
+                </li>
+              );
+            })}
+          </ul>
+          {stale.length > 10 && <p><Link href="/calendar">See all {stale.length} on the calendar →</Link></p>}
+        </section>
+      </div>
     </main>
+  );
+}
+
+type CardProps = {
+  institution: Institution;
+  summary: Summary | undefined;
+  timeline: { latest?: EarningsEvent; next?: EarningsEvent } | undefined;
+  following: boolean;
+};
+
+function BankCard({ institution: i, summary, timeline, following }: CardProps) {
+  const latest = timeline?.latest;
+  const next = timeline?.next;
+  const outOfDate = latest && needsRefresh(latest, summary?.researched_at ?? null);
+  return (
+    <article className="card">
+      <div className="card-head">
+        <Link href={`/banks/${i.slug}`} className="card-title">{i.name}</Link>
+        <FollowButton slug={i.slug} name={i.name} following={following} compact />
+      </div>
+      <div className="dim">
+        {categoryLabel(i.category)} · {formatAssets(i.assets_b)}
+        {i.opportunity && <> · <span className={`badge ${i.opportunity.toLowerCase()}`}>{i.opportunity}</span></>}
+      </div>
+      {outOfDate ? (
+        <div className="status warn">{latest.period} results out {formatDay(latest.event_date)} · dashboard shows {shortQuarter(i.latest_quarter)}</div>
+      ) : next ? (
+        <div className="status">Next results {formatDay(next.event_date)}{next.status === "estimated" ? " (estimated)" : ""}</div>
+      ) : null}
+      {summary?.sales_theme && <p className="theme">{summary.sales_theme}</p>}
+      {summary && summary.lead_products.length > 0 && (
+        <div className="chips">
+          <span className="dim">Lead with:</span>
+          {summary.lead_products.map((p) => <span key={p} className="chip">{p}</span>)}
+        </div>
+      )}
+    </article>
   );
 }
