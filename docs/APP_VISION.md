@@ -229,3 +229,12 @@ Data: `earnings_events` holds Q3 2026 and Q4 2026 dates for all 58 institutions.
 
 Finding: on 24 Oct, 34 of the 58 dashboards are already behind the latest published results (Q3 2026 out, dashboard still Q2). That is the case for Phase 3's automatic refresh.
 
+### Phase 4 status (24 Oct 2026)
+Built:
+- **Alerts in the app** (`/alerts`, with an unread count in the menu): written by the database the moment a followed bank's dashboard is republished, its results are marked reported, or news is added. Opening one marks it read and goes to the "What changed" page, the bank, or the article.
+- **Instant email alerts**: every 30 minutes, new dashboard and results alerts are gathered into one email per person.
+- **Weekly digest** (Monday 11:23 UTC, after the weekly news job): dashboards updated, results out, who reports in the next two weeks, news, and followed banks still waiting for a refresh. Anyone following nothing gets a market-wide version.
+- **Email settings** on each person's account page (instant alerts and digest, each on or off), and an **Email** panel in Admin with test and digest-preview buttons and a log of every send.
+
+Needs: a Resend API key in Vercel (`RESEND_API_KEY`). Until a sending domain is verified in Resend, email only reaches the Resend account owner, which is enough for a personal pilot. Sending to sellers at their work addresses needs a verified domain (`EMAIL_FROM`). The same domain can later send Supabase password-reset emails.
+
