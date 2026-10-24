@@ -47,10 +47,17 @@ function changed<T>(before: T | null | undefined, after: T | null | undefined) {
 }
 
 export function compareDashboards(before: Dashboard, after: Dashboard): Changes {
-  const oldMetrics = new Map((before.metrics ?? []).filter((m) => m.l).map((m) => [m.l!, m]));
+  // Match cards by label; a card renamed between versions (e.g. "Deposit Cost" →
+  // "Interest-Bearing Deposit Cost") falls back to the card in the same position.
+  const oldList = before.metrics ?? [];
+  const oldMetrics = new Map(oldList.filter((m) => m.l).map((m) => [m.l!, m]));
+  const newLabels = new Set((after.metrics ?? []).map((m) => m.l));
   const metrics: MetricChange[] = (after.metrics ?? [])
-    .filter((m) => m.l)
-    .map((m) => ({ label: m.l!, before: oldMetrics.get(m.l!)?.v ?? null, after: m.v ?? null, asOf: m.s ?? null }));
+    .map((m, i) => {
+      const old = oldMetrics.get(m.l!) ?? (oldList[i]?.l && !newLabels.has(oldList[i].l) ? oldList[i] : undefined);
+      return { label: m.l!, before: old?.v ?? null, after: m.v ?? null, asOf: m.s ?? null };
+    })
+    .filter((m) => m.label);
 
   const oldProducts = new Map((before.products ?? []).filter((p) => p.name).map((p) => [p.name!, p]));
   const newProducts = new Map((after.products ?? []).filter((p) => p.name).map((p) => [p.name!, p]));
