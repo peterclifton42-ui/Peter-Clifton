@@ -1,69 +1,43 @@
 # Weekly task — keep the earnings calendar right and collect fresh news
 
-Runs unattended every Monday morning (scheduled task "Bank Intelligence — weekly calendar and news"). Fresh session: decide everything yourself and never ask questions. Budget: **30 web calls** in total.
+Runs unattended every Monday morning (scheduled task "Bank Intelligence — weekly calendar and news"). Fresh session: decide everything yourself and never ask questions. Budget: **30 web calls** in total. Your final message is emailed to the owner, so end with a short, plain summary.
 
-Repository: `/home/user/Peter-Clifton` (`git pull -q origin main`; clone peterclifton42-ui/Peter-Clifton if it is missing). Database: Supabase project `bank-intelligence` (id `zwevbnccqixavejvlwhb`), through the Supabase connector's `execute_sql`.
+Repository: `/home/user/Peter-Clifton`. Run `git pull -q origin main` there; if the folder is missing, `git clone https://github.com/peterclifton42-ui/Peter-Clifton` into it. All database work goes through `python3 pipeline/db.py …`, which uses the `SUPABASE_SECRET_KEY` environment variable. Run `python3 pipeline/db.py check` first: if the key is missing, stop and report exactly that.
 
-Start a run: `insert into public.refresh_runs (job, note) values ('weekly', 'Calendar and news') returning id;`. Keep that id as the RUN ID.
+Start a run with `python3 pipeline/db.py start weekly "Calendar and news"`. Keep the printed `run_id` as the RUN ID.
 
 ## Part 1 — Earnings calendar (about 15 calls)
 
-1. **Dates that have passed but aren't marked reported:**
-   ```sql
-   select e.slug, i.name, i.ticker, e.period, e.event_date, e.kind, e.status
-   from public.earnings_events e join public.institutions i using (slug)
-   where e.status <> 'reported' and e.event_date <= current_date order by e.event_date;
-   ```
-   - **Earnings releases:** confirm each one from the company's release or SEC 8-K. Then set `status = 'reported'`, the actual `event_date` and `source_url`. If the company has moved the date, set the new date and `status = 'scheduled'` (or leave `'estimated'` if it's still unannounced).
-   - **NCUA and FFIEC call-report rows:** mark `reported` once the quarter's data is public. For NCUA, check that the quarterly data page lists the quarter; for FFIEC, that the call report is on cdr.ffiec.gov. Otherwise move the date out a week.
+1. **Dates that have passed but aren't marked reported:** `python3 pipeline/db.py events-due`.
+   - **Earnings releases:** confirm each one from the company's own release or SEC 8-K. Then mark it:
+     `python3 pipeline/db.py set-event <slug> "<period>" --status reported --date <actual date> --source <url> --note ""`
+     If the company has moved the date, set the new `--date` with `--status scheduled`, or leave it `estimated` if the date is still unannounced.
+   - **NCUA and FFIEC call-report rows:** mark these `reported` once the quarter's data is public. For NCUA, the quarterly data page lists the quarter; for FFIEC, the call report is on cdr.ffiec.gov. If it isn't public yet, move `--date` out a week.
 
-2. **Dates in the next 21 days that aren't confirmed:**
-   ```sql
-   select e.slug, i.name, i.ticker, e.period, e.event_date from public.earnings_events e join public.institutions i using (slug)
-   where e.status = 'estimated' and e.kind = 'earnings'
-     and e.event_date between current_date and current_date + 21 order by e.event_date;
-   ```
-   Search for each company's announcement. If one exists, set the confirmed date, `status = 'scheduled'`, `source_url` and `note = null`.
+2. **Unconfirmed earnings dates in the next 21 days:** `python3 pipeline/db.py events-upcoming`. For each, search for the company's announcement. If one exists, run:
+   `python3 pipeline/db.py set-event <slug> "<period>" --date <date> --status scheduled --source <url> --note ""`
 
-3. **Make sure every institution has a next period:** for each institution whose latest period is now `reported`, insert the following quarter if it's missing, as `estimated`:
+3. **Make sure every institution has a next period:** `python3 pipeline/db.py events-latest` shows each institution's latest period. Where that period is `reported`, add the following quarter as estimated:
    - **Earnings:** 13 weeks after the reported date.
    - **NCUA:** the first Thursday of the third month after quarter end.
    - **FFIEC:** about 36 days after quarter end.
 
-   Use `insert … on conflict (slug, period) do nothing`, with `note` set to "Estimated from the previous quarter's date".
+   Command: `python3 pipeline/db.py set-event <slug> "<next period>" --date <date> --status estimated --kind <earnings|call_report_ncua|call_report_ffiec> --note "Estimated from the previous quarter's date"`
 
-Every update also sets `updated_at = now()`. Never mark something reported without a source.
+Never mark something reported without a source.
 
 ## Part 2 — News (about 15 calls)
 
-Who to cover, followed institutions first, at most 15:
+`python3 pipeline/db.py news-targets` lists up to 15 institutions, most-followed first. For each one, make one WebSearch: `"<name>" news <current month> <year>`. Keep at most 3 items from the last 14 days that a seller would care about: results, deals, leadership changes, launches, branch moves, regulatory actions and analyst rating changes. Skip stock-price noise and listicles.
 
-```sql
-select i.slug, i.name, count(f.user_id) as followers
-from public.institutions i left join public.favourites f using (slug)
-group by i.slug, i.name order by followers desc, i.assets_b desc nulls last limit 15;
-```
+Add each item:
 
-For each one, make one WebSearch: `"<name>" news <current month> <year>`. Keep at most 3 items from the last 14 days that a seller would care about: results, deals, leadership changes, launches, branch moves, regulatory actions, ratings. Skip stock-price noise and listicles. Insert each item:
+`python3 pipeline/db.py add-news <slug> <YYYY-MM-DD> "<headline as published>" "<one plain sentence on why it matters to a seller>" "<publisher>" <url>`
 
-```sql
-insert into public.news_items (slug, published_on, headline, summary, source_name, url)
-values ('<slug>', '<YYYY-MM-DD>', '<headline>', '<one plain sentence on why it matters to a seller>', '<publisher>', '<url>')
-on conflict (slug, headline) do nothing;
-```
-
-Rules for news items:
-- Use the headline as published. Never invent a figure.
-- The summary is one sentence.
-- No item without a working source URL.
-- Double any single quote inside a string ('').
+Never invent a figure, and never add an item without a working source URL.
 
 ## Finish
 
-```sql
-update public.refresh_runs set status = 'done', finished_at = now(),
-  note = 'Calendar: <n> confirmed, <n> marked reported, <n> next-quarter rows added. News: <n> items for <n> institutions. <calls> calls.'
-where id = <RUN ID>;
-```
+`python3 pipeline/db.py finish <RUN ID> done "Calendar: <n> confirmed, <n> marked reported, <n> next-quarter rows. News: <n> items for <n> institutions. <calls> calls."`
 
-If anything fails, set `status = 'failed'` with the step and error in `note`, and email peter.clifton42@gmail.com, subject "Bank Intelligence weekly task failed (<date>)".
+If anything fails, run `python3 pipeline/db.py finish <RUN ID> failed "<step>: <exact error>"` and say so plainly in your final message.

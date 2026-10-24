@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Publish a researched intel JSON to the Bank Intelligence app.
 
-    python3 pipeline/publish.py intel.json --token-file .ingest-token
-    python3 pipeline/publish.py intel.json --dry-run      # every check, no upload
+    python3 pipeline/publish.py intel.json               # needs SUPABASE_SECRET_KEY
+    python3 pipeline/publish.py intel.json --dry-run     # every check, no upload
 
 Steps, each of which stops the run on failure:
   1. build_v2.py turns the intel JSON into a dashboard (its /mnt paths are
@@ -12,7 +12,8 @@ Steps, each of which stops the run on failure:
      ignored, exactly as Run B did; any other error stops the run.
   3. The D object is lifted back out of the dashboard and rendered in headless
      Chromium with the current page template: all 8 tabs, no script errors.
-  4. The D object is uploaded through ingest_snapshot() with a one-time token.
+  4. The D object is uploaded through pipeline_publish(), which only the
+     Supabase secret key (SUPABASE_SECRET_KEY) may call.
 """
 import argparse
 import json
@@ -22,15 +23,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import urllib.error
-import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 REF = os.path.join(ROOT, "reference")
-
-SUPABASE_URL = "https://zwevbnccqixavejvlwhb.supabase.co"
-PUBLISHABLE_KEY = "sb_publishable_6iJSs4ir5wQ9sEyF16tjJA_vGG6Mikn"
 
 KNOWN_FALSE_POSITIVES = ("CHART SCALE ERROR", "STRATEGY: D.strategy serialised as object")
 
@@ -109,28 +105,14 @@ def directory_row(d):
     }
 
 
-def upload(token, row, data):
-    body = json.dumps({"p_token": token, "p_row": row, "p_data": data}).encode()
-    req = urllib.request.Request(
-        f"{SUPABASE_URL}/rest/v1/rpc/ingest_snapshot", body,
-        {"apikey": PUBLISHABLE_KEY, "Content-Type": "application/json"},
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            return json.load(resp)
-    except urllib.error.HTTPError as e:
-        fail(f"upload refused ({e.code}): {e.read().decode()[:300]}")
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("intel")
-    ap.add_argument("--token-file")
     ap.add_argument("--source", default="refresh")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
-    if not args.dry_run and not args.token_file:
-        fail("--token-file is required unless --dry-run")
+    if not args.dry_run and not os.environ.get("SUPABASE_SECRET_KEY"):
+        fail("SUPABASE_SECRET_KEY is not set (see pipeline/db.py)")
 
     with tempfile.TemporaryDirectory() as work:
         slug, html = run_build(os.path.abspath(args.intel), work)
@@ -147,8 +129,9 @@ def main():
     if args.dry_run:
         print(f"DRY RUN OK — {slug} would be published ({len(json.dumps(data)):,} bytes of dashboard data)")
         return
-    token = open(args.token_file).read().strip()
-    snapshot_id = upload(token, row, data)
+    sys.path.insert(0, HERE)
+    import db
+    snapshot_id = db.rpc("pipeline_publish", {"p_row": row, "p_data": data})
     print(f"PUBLISHED — {slug} is live as snapshot {snapshot_id}")
 
 

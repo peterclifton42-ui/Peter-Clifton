@@ -2,15 +2,15 @@
 
 Runs unattended twice a day (scheduled task "Bank Intelligence — refresh one dashboard"). Fresh session: decide everything yourself and never ask questions. This replaces the old Run A / Run B pair. The research half is Run A's routine, unchanged. The publish half is now a single command, and there is no email to Curinos: the app is the delivery.
 
-Repository: `/home/user/Peter-Clifton` (if it is missing, `git clone` peterclifton42-ui/Peter-Clifton there). Database: the Supabase project `bank-intelligence` (id `zwevbnccqixavejvlwhb`), reached through the Supabase connector's `execute_sql`. Every query below is run that way.
+Repository: `/home/user/Peter-Clifton` (if it is missing, `git clone https://github.com/peterclifton42-ui/Peter-Clifton` there). Database: the Supabase project `bank-intelligence`, reached only through `python3 pipeline/db.py …` (and `pipeline/publish.py`). Both use the `SUPABASE_SECRET_KEY` environment variable. Run `python3 pipeline/db.py check` first: if it says the key is not set, stop and report exactly that.
 
-**Success is one institution published, or a clean skip.** A failed run must leave the live dashboard untouched. Publishing happens only in step 7, after every check has passed.
+**Success is one institution published, or a clean skip.** A failed run must leave the live dashboard untouched. Publishing happens only in step 7, after every check has passed. Your final message is emailed to the owner, so end with a short, plain summary.
 
 ---
 
 ## Step 0 — Set up and guard
 
-1. `cd /home/user/Peter-Clifton && git pull -q origin main`.
+1. `cd /home/user/Peter-Clifton && git pull -q origin main && python3 pipeline/db.py check`.
 2. Run `date -u`. You fire at 00:07 and 12:07 UTC. If it is more than 6 hours past your slot, you are a stalled session that resumed late: do nothing and stop.
 3. Make a working folder, `mkdir -p /tmp/refresh && cd /tmp/refresh`, and copy into it:
    - `reference/score_v4.py`
@@ -20,21 +20,16 @@ Repository: `/home/user/Peter-Clifton` (if it is missing, `git clone` peterclift
 
 ## Step 1 — Pick the institution
 
-```sql
-select slug, name, period, event_date, researched_at, followers
-from pipeline.refresh_queue
-where slug not in (select slug from public.refresh_runs
-                   where job = 'refresh' and status = 'running' and started_at > now() - interval '6 hours'
-                     and slug is not null)
-limit 1;
+```bash
+python3 pipeline/db.py queue
 ```
 
-The queue lists institutions whose latest published results are newer than their dashboard, most-followed first, then oldest results first.
+The queue lists institutions whose latest published results are newer than their dashboard, most-followed first, then oldest results first. It leaves out anything another run claimed in the last 6 hours. Take the **first** entry.
 
-- **No row:** log `insert into public.refresh_runs (job, status, finished_at, note) values ('refresh', 'skipped', now(), 'Queue empty: every dashboard is current');` and stop. That is a correct outcome.
-- **Otherwise**, claim it: `insert into public.refresh_runs (job, slug, note) values ('refresh', '<slug>', 'Researching <period> results') returning id;`. Keep that id as the RUN ID.
+- **Empty list:** run `python3 pipeline/db.py start refresh "Queue empty"`, then `python3 pipeline/db.py finish <run id> skipped "Queue empty: every dashboard is current"`, and stop. That is a correct outcome.
+- **Otherwise, claim it:** `python3 pipeline/db.py start refresh <slug> "Researching <period> results"`. Keep the printed `run_id` as the RUN ID.
 
-To see what the institution is: `select name, category, type_label, ticker, hq, assets_b, latest_quarter from public.institutions where slug = '<slug>';`. Keep the same slug; the app tracks it by that.
+To see what the institution is: `python3 pipeline/db.py institution <slug>`. Keep the same slug; the app tracks it by that.
 
 ## Step 2 — Read the method
 
@@ -116,37 +111,26 @@ It builds the dashboard, runs the validator and renders all 8 tabs. Fix anything
 
 ## Step 7 — Publish
 
-Mint a one-time token and register **only its hash**:
-
 ```bash
-cd /tmp/refresh && python3 -c "import secrets,hashlib; t=secrets.token_hex(32); open('.ingest-token','w').write(t); print(hashlib.sha256(t.encode()).hexdigest())"
+cd /home/user/Peter-Clifton && python3 pipeline/publish.py /tmp/refresh/intel.json --source "refresh <period>"
 ```
 
-```sql
-insert into pipeline.ingest_tokens (token_hash) values ('<the printed hash>');
-```
-
-```bash
-cd /home/user/Peter-Clifton && python3 pipeline/publish.py /tmp/refresh/intel.json --token-file /tmp/refresh/.ingest-token --source "refresh <period>"
-```
-
-It must print `PUBLISHED — <slug> is live as snapshot <id>`. The token works once and expires after 2 hours, so if the publish fails after the token was used, mint a new one.
+It repeats every check, then uploads. It must print `PUBLISHED — <slug> is live as snapshot <id>`.
 
 ## Step 8 — Close the run
 
-```sql
-update public.refresh_runs set status = 'published', finished_at = now(),
-  note = '<period>: completeness n/15, <calls> calls, <peers> peers, benchmark <file>'
-where id = <RUN ID>;
+```bash
+python3 pipeline/db.py finish <RUN ID> published "<period>: completeness n/15, <calls> calls, <peers> peers, benchmark <file>"
 ```
 
-Then stop.
+Then stop, with a short summary as your final message.
 
 ## If anything fails
 
-Leave the live dashboard as it is: never publish a partial build. Then:
+Leave the live dashboard as it is: never publish a partial build. Run:
 
-1. Run `update public.refresh_runs set status = 'failed', finished_at = now(), note = '<step>: <exact error>' where id = <RUN ID>;`.
-2. Email peter.clifton42@gmail.com, subject "Bank Intelligence refresh failed — <institution> (<date>)", naming the step and the exact error.
+```bash
+python3 pipeline/db.py finish <RUN ID> failed "<step>: <exact error>"
+```
 
-The next run will pick the same institution again, because it is still at the top of the queue.
+End with a final message that names the institution, the step and the exact error; the owner is emailed your final message. The next run will pick the same institution again, because it is still at the top of the queue.
