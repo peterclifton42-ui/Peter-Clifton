@@ -223,3 +223,19 @@ table.calendar td:nth-child(2) { width: 30%; }
 table.calendar td:nth-child(3) { width: 80px; white-space: nowrap; }
 table.calendar td:nth-child(4) { width: 150px; }
 table.calendar td:nth-child(5) { width: 250px; }
+
+/* ---------- phase 3 ---------- */
+.card .status.good { color: var(--good); }
+.card-news { font-size: 12px; }
+.news-strip { display: flex; gap: 18px; flex-wrap: wrap; padding: 8px 24px; border-bottom: 1px solid var(--border); font-size: 13px; background: var(--surface); }
+dl.changes { display: grid; grid-template-columns: 140px 1fr; gap: 10px 16px; margin: 0; }
+dl.changes dt { color: var(--muted); font-weight: 600; }
+dl.changes dd { margin: 0; }
+dl.changes s { color: var(--subtle); }
+table.compare { min-width: 520px; }
+table.compare tbody tr { cursor: default; }
+table.compare tr.same td { color: var(--subtle); }
+.badge.run-published, .badge.run-done { background: rgba(16, 185, 129, .15); color: var(--good); border: 1px solid rgba(16, 185, 129, .4); }
+.badge.run-running { background: rgba(59, 130, 246, .12); color: var(--accent-text); border: 1px solid rgba(59, 130, 246, .35); }
+.badge.run-failed { background: rgba(239, 68, 68, .12); color: var(--bad); border: 1px solid rgba(239, 68, 68, .35); }
+.badge.run-skipped { background: none; color: var(--subtle); border: 1px dashed var(--border); }

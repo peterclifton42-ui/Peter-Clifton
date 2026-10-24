@@ -12,23 +12,28 @@ import { FollowButton } from "./follow-button";
 export const metadata: Metadata = { title: "Home" };
 
 type Summary = { slug: string; sales_theme: string | null; lead_products: string[]; researched_at: string };
+type News = { published_on: string; headline: string; url: string | null };
 
 export default async function HomePage() {
   const viewer = await requireViewer();
   const supabase = await createClient();
-  const [{ data: institutions }, { data: summaries }, { data: events }, followed] = await Promise.all([
+  const today = todayISO();
+  const [{ data: institutions }, { data: summaries }, { data: events }, followed, { data: newsRows }] = await Promise.all([
     supabase.from("institutions").select(INSTITUTION_COLUMNS).order("assets_b", { ascending: false }),
     supabase.from("institution_summaries").select("slug, sales_theme, lead_products, researched_at"),
     supabase.from("earnings_events").select(EVENT_COLUMNS).order("event_date"),
     followedSlugs(viewer.id),
+    supabase.from("news_items").select("slug, published_on, headline, url")
+      .gte("published_on", addDays(today, -14)).order("published_on", { ascending: false }),
   ]);
 
-  const today = todayISO();
   const all = (institutions ?? []) as Institution[];
   const bySlug = new Map(all.map((i) => [i.slug, i]));
   const summary = new Map(((summaries ?? []) as Summary[]).map((s) => [s.slug, s]));
   const evs = (events ?? []) as EarningsEvent[];
   const timeline = latestAndNext(evs, today);
+  const latestNews = new Map<string, News>();
+  for (const n of (newsRows ?? []) as (News & { slug: string })[]) if (!latestNews.has(n.slug)) latestNews.set(n.slug, n);
 
   const mine = all.filter((i) => followed.has(i.slug));
   const suggestions = all.filter((i) => i.opportunity === "HIGH").slice(0, 6);
@@ -57,7 +62,7 @@ export default async function HomePage() {
             </p>
             <div className="cards">
               {suggestions.map((i) => (
-                <BankCard key={i.slug} institution={i} summary={summary.get(i.slug)} timeline={timeline.get(i.slug)} following={false} />
+                <BankCard key={i.slug} institution={i} summary={summary.get(i.slug)} timeline={timeline.get(i.slug)} news={latestNews.get(i.slug)} today={today} following={false} />
               ))}
             </div>
             <p><Link href="/banks">Browse all {all.length} banks and credit unions →</Link></p>
@@ -65,7 +70,7 @@ export default async function HomePage() {
         ) : (
           <div className="cards">
             {mine.map((i) => (
-              <BankCard key={i.slug} institution={i} summary={summary.get(i.slug)} timeline={timeline.get(i.slug)} following />
+              <BankCard key={i.slug} institution={i} summary={summary.get(i.slug)} timeline={timeline.get(i.slug)} news={latestNews.get(i.slug)} today={today} following />
             ))}
           </div>
         )}
@@ -121,13 +126,16 @@ type CardProps = {
   institution: Institution;
   summary: Summary | undefined;
   timeline: { latest?: EarningsEvent; next?: EarningsEvent } | undefined;
+  news: News | undefined;
+  today: string;
   following: boolean;
 };
 
-function BankCard({ institution: i, summary, timeline, following }: CardProps) {
+function BankCard({ institution: i, summary, timeline, news, today, following }: CardProps) {
   const latest = timeline?.latest;
   const next = timeline?.next;
   const outOfDate = latest && needsRefresh(latest, summary?.researched_at ?? null);
+  const justUpdated = !outOfDate && summary && summary.researched_at.slice(0, 10) >= addDays(today, -7);
   return (
     <article className="card">
       <div className="card-head">
@@ -138,12 +146,23 @@ function BankCard({ institution: i, summary, timeline, following }: CardProps) {
         {categoryLabel(i.category)} · {formatAssets(i.assets_b)}
         {i.opportunity && <> · <span className={`badge ${i.opportunity.toLowerCase()}`}>{i.opportunity}</span></>}
       </div>
-      {outOfDate ? (
+      {justUpdated ? (
+        <div className="status good">
+          Dashboard updated {formatDay(summary.researched_at.slice(0, 10))} with {shortQuarter(i.latest_quarter)} results ·{" "}
+          <Link href={`/banks/${i.slug}/changes`}>What changed</Link>
+        </div>
+      ) : outOfDate ? (
         <div className="status warn">{latest.period} results out {formatDay(latest.event_date)} · dashboard shows {shortQuarter(i.latest_quarter)}</div>
       ) : next ? (
         <div className="status">Next results {formatDay(next.event_date)}{next.status === "estimated" ? " (estimated)" : ""}</div>
       ) : null}
       {summary?.sales_theme && <p className="theme">{summary.sales_theme}</p>}
+      {news && (
+        <div className="card-news">
+          <span className="dim">News {formatDay(news.published_on)}:</span>{" "}
+          {news.url ? <a href={news.url} target="_blank" rel="noreferrer">{news.headline}</a> : news.headline}
+        </div>
+      )}
       {summary && summary.lead_products.length > 0 && (
         <div className="chips">
           <span className="dim">Lead with:</span>
