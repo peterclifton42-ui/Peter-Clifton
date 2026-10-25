@@ -15,3 +15,20 @@ export async function changePassword(_prev: PasswordState, formData: FormData): 
   if (error) return { error: error.message };
   return { ok: true };
 }
+
+export type PrefsState = { error?: string; ok?: boolean } | undefined;
+
+export async function saveEmailPreferences(_prev: PrefsState, formData: FormData): Promise<PrefsState> {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+  const userId = data?.claims?.sub;
+  if (!userId) return { error: "Please sign in again." };
+  const { error } = await supabase.from("email_preferences").upsert({
+    user_id: userId,
+    instant: formData.get("instant") === "on",
+    digest: formData.get("digest") === "on",
+    updated_at: new Date().toISOString(),
+  });
+  if (error) return { error: error.message };
+  return { ok: true };
+}

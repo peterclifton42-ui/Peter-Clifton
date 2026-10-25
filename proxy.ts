@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./lib/supabase/config";
 
 // Runs before every page: refreshes the login session and sends anyone who is
-// not signed in to /login.
+// not signed in to /login. The scheduler's email endpoints check their own secret.
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -40,5 +40,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|api/email).*)"],
 };

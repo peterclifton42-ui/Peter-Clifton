@@ -3,6 +3,8 @@
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
+import { sendPreview } from "@/lib/email/jobs";
+import { emailConfigured } from "@/lib/email/send";
 import { adminConfigured, createAdminClient } from "@/lib/supabase/admin";
 
 export type AdminState = { error?: string; created?: { email: string; password: string } } | undefined;
@@ -72,4 +74,16 @@ export async function removeUser(formData: FormData) {
   if (id === viewer.id || !adminConfigured()) return;
   await createAdminClient().auth.admin.deleteUser(id);
   revalidatePath("/admin");
+}
+
+export type EmailPreviewState = { error?: string; sentTo?: string } | undefined;
+
+export async function sendEmailPreview(_prev: EmailPreviewState, formData: FormData): Promise<EmailPreviewState> {
+  const viewer = await requireAdmin();
+  if (!adminConfigured()) return { error: NO_KEY };
+  if (!emailConfigured()) return { error: "Email isn't set up yet: add RESEND_API_KEY in Vercel (see the note above)." };
+  const kind = formData.get("kind") === "digest" ? "digest" : "test";
+  const result = await sendPreview(createAdminClient(), viewer.id, kind);
+  revalidatePath("/admin");
+  return result.ok ? { sentTo: result.to } : { error: result.error };
 }

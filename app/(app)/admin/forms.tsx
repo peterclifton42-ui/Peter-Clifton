@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { createUser, removeUser, resetPassword, setRole, type AdminState } from "./actions";
+import { createUser, removeUser, resetPassword, sendEmailPreview, setRole, type AdminState } from "./actions";
 
 function PasswordToShare({ state }: { state: AdminState }) {
   if (state?.error) return <div className="notice error">{state.error}</div>;
@@ -80,5 +80,19 @@ export function UserRow({ id, email, fullName, role, isSelf }: UserRowProps) {
       </div>
       <PasswordToShare state={state} />
     </div>
+  );
+}
+
+export function EmailPreviewForm() {
+  const [state, action, pending] = useActionState(sendEmailPreview, undefined);
+  return (
+    <form action={action}>
+      {state?.error && <div className="notice error">{state.error}</div>}
+      {state?.sentTo && <div className="notice ok">Sent to {state.sentTo}. It can take a minute to arrive; check spam too.</div>}
+      <div className="row">
+        <button type="submit" name="kind" value="test" className="secondary" disabled={pending}>Send me a test email</button>
+        <button type="submit" name="kind" value="digest" className="secondary" disabled={pending}>Send me this week&apos;s digest</button>
+      </div>
+    </form>
   );
 }
