@@ -249,3 +249,18 @@ Data: official call reports rather than the dashboards' own cards, whose labels 
 
 Known limits: deposit growth includes acquisitions (flagged † when 40% or more). Credit union margin is measured against assets, as NCUA does, so it reads slightly lower than a bank's. Holding companies are measured on their bank charters only.
 
+### Phase 6 status (25 Oct 2026)
+Built:
+- **Insights** (`/insights`), for all institutions, banks only, credit unions only or the ones you follow:
+  - **Themes across the market:** 15 themes, from deposit pricing to credit and CRE to M&A, counted by where each comes up (a threat, an opportunity, a strategic priority, or urgent now). Each theme opens to the quoted sentence from every dashboard behind the count.
+  - **Where the demand is:** products ranked by how many dashboards make them priority 1 or 2.
+  - **What gets banks to say yes:** the lead angle on 42 of 58 dashboards is "The Data Gap No Internal Team Can Close". The objections sellers meet are grouped into types ("we're already performing well", "we do this ourselves", "we already have a vendor", "not now", "can we have the roadmap product", "we're a cooperative", plus "lines that backfire"), each with the playbooks' answers.
+- **Products** (`/products`, `/products/<product>`) cover all 37 catalogue products by pillar. Each product page shows:
+  - **Who to call:** institutions at priority 1–2, ranked by fit, with the dashboard's reason and opening line;
+  - **Also listed:** priority 3, and the institutions ruled out with the reason;
+  - **Objections and answers;**
+  - **About it:** the catalogue's description, strong-fit signals and hooks, without the internal scoring notes.
+- **Guardrails from decision 12a**, enforced in the app: roadmap modules labelled "Roadmap — not yet available", unlisted products labelled "Availability to be confirmed", both capped at priority 3 even on older dashboards that ranked them higher, and the UK-only eBenchmarkers kept off US target lists.
+
+How: no AI model at request time. Themes and objection types are keyword rules over the dashboards' own text, and every count shows its evidence so a seller can judge it. Phase 7's assistant can later add summaries on top. Still open from decision 10: a curated list of threat themes signed off by the sales team, and a definition of the HIGH/MEDIUM/LOW opportunity rating (decision 12).
+
