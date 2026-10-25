@@ -8,6 +8,7 @@ import { followedSlugs } from "@/lib/follows";
 import { categoryLabel, formatAssets, shortQuarter, INSTITUTION_COLUMNS, type Institution } from "@/lib/institutions";
 import { createClient } from "@/lib/supabase/server";
 import { suggestPeers } from "@/lib/metrics";
+import { withCollectedNews } from "@/lib/news/merge";
 import { AskDrawer } from "../../ask/ask-chat";
 import { RefreshNewsButton, RequestRefreshButton } from "./bank-actions";
 import { FollowButton } from "../../follow-button";
@@ -38,7 +39,7 @@ export default async function BankPage({ params }: Props) {
   const viewer = await requireViewer();
   const supabase = await createClient();
   const today = todayISO();
-  const [{ data: snapshot }, { data: events }, followed, { count: versions }, { data: news }, { data: all }, { count: newsTotal }, { data: requests }] = await Promise.all([
+  const [{ data: snapshot }, { data: events }, followed, { count: versions }, { data: news }, { data: all }, { count: newsTotal }, { data: requests }, { data: collected }] = await Promise.all([
     supabase.from("snapshots").select("data, loaded_at").eq("id", institution.current_snapshot_id).single(),
     supabase.from("earnings_events").select(EVENT_COLUMNS).eq("slug", slug),
     followedSlugs(viewer.id),
@@ -49,13 +50,15 @@ export default async function BankPage({ params }: Props) {
     supabase.from("news_items").select("id", { count: "exact", head: true }).eq("slug", slug),
     supabase.from("refresh_requests").select("requested_by, requested_at").eq("slug", slug).is("fulfilled_at", null)
       .order("requested_at").limit(1),
+    supabase.from("news_items").select("published_on, headline, summary, source_name, url, tag, sales_angle, created_at")
+      .eq("slug", slug).order("published_on", { ascending: false }).limit(30),
   ]);
   const request = requests?.[0] ? { byYou: requests[0].requested_by === viewer.id, at: requests[0].requested_at as string } : null;
   if (!snapshot) notFound();
   const { latest, next } = latestAndNext((events ?? []) as EarningsEvent[], today).get(slug) ?? {};
   const outOfDate = latest && needsRefresh(latest, snapshot.loaded_at);
 
-  const html = await renderDashboard(snapshot.data);
+  const html = await renderDashboard(withCollectedNews(snapshot.data, collected ?? [], snapshot.loaded_at));
 
   return (
     <>
