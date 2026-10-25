@@ -19,7 +19,7 @@ Roles: **pending** (signed up but no access), **seller** (can see everything), *
 
 1. **Admin key in Vercel.** In Supabase: *Project Settings → API Keys → Secret keys*, create or copy a secret key. In Vercel: *peter-clifton → Settings → Environment Variables*, add `SUPABASE_SECRET_KEY` with that value for Production and Preview, then redeploy. Without it, the admin screen can't create logins.
 2. **Turn off public sign-up.** In Supabase: *Authentication → Sign In / Providers → Email*, switch off *Allow new users to sign up*. (Anyone who did sign up would only ever be "pending" with no access, but this closes the door entirely.)
-3. **Ask assistant (Claude API).** At console.anthropic.com create an API key and set a monthly spend limit (Settings → Limits). In Vercel add `ANTHROPIC_API_KEY`, then redeploy. Optional: `ASK_DAILY_LIMIT` (questions per person per 24 hours, default 40).
+3. **Ask assistant (Claude API).** At console.anthropic.com create an API key and set a monthly spend limit (Settings → Limits). In Vercel add `ANTHROPIC_API_KEY`, then redeploy. If the key was created at organisation level rather than inside a workspace, also add `ANTHROPIC_WORKSPACE_ID` (Console → Settings → Workspaces → the workspace → its ID). Optional: `ASK_DAILY_LIMIT` (questions per person per 24 hours, default 40).
 4. **Email (Resend).** In Resend (resend.com): *API Keys → Create API key* with "Sending access". In Vercel add `RESEND_API_KEY` with that value, then redeploy. Until a domain is verified in Resend, email can only go to the Resend account's own address. After verifying a domain, also add `EMAIL_FROM`, for example `Bank Intelligence <alerts@yourdomain.com>`. Admin → Email has buttons to send yourself a test email and this week's digest.
 
 ## Compare
