@@ -16,7 +16,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <>
       <header className="topbar">
-        <Link href="/" className="brand">{APP_NAME}</Link>
+        <Link href="/" className="brand" aria-label={`${APP_NAME} home`}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- a small static SVG */}
+          <img src="/curinos-logo.svg" alt="" width={90} height={20} />
+          <span>{APP_NAME}</span>
+        </Link>
         {viewer.role !== "pending" && (
           <nav className="nav">
             <Link href="/">Home</Link>

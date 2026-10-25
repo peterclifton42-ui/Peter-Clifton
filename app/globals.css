@@ -13,6 +13,8 @@
   --good: #34d399;
   --warn: #fbbf24;
   --bad: #f87171;
+  /* One font stack for the app and the dashboards inside it (lib/dashboard.ts). */
+  --font: "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
   color-scheme: dark;
 }
 
@@ -23,7 +25,7 @@ html, body { margin: 0; padding: 0; }
 body {
   background: var(--bg);
   color: var(--text);
-  font: 14px/1.5 "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+  font: 14px/1.5 var(--font);
   min-height: 100vh;
 }
 
@@ -42,10 +44,12 @@ h1, h2, h3 { color: var(--text-strong); margin: 0; }
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
 }
-.brand { font-weight: 700; font-size: 16px; color: var(--text-strong); }
+.brand { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; color: var(--text-strong); }
+.brand img { display: block; height: 20px; width: auto; }
+.brand span { font-weight: 700; font-size: 17px; line-height: 1.15; letter-spacing: -.01em; white-space: nowrap; }
 .brand:hover { text-decoration: none; }
 .nav { display: flex; flex-wrap: wrap; gap: 4px; }
-.nav a { color: var(--muted); padding: 6px 12px; border-radius: 6px; }
+.nav a { color: var(--muted); padding: 6px 12px; border-radius: 6px; font-size: 14px; }
 .nav a:hover { color: var(--text-strong); background: var(--surface-2); text-decoration: none; }
 .user { margin-left: auto; display: flex; align-items: center; gap: 12px; color: var(--subtle); font-size: 13px; }
 
@@ -106,6 +110,7 @@ button.link { background: none; color: var(--accent-text); padding: 0; font-weig
 .login-wrap { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
 .login-card { width: 100%; max-width: 380px; }
 .login-card h1 { font-size: 20px; margin-bottom: 4px; }
+.login-logo { display: block; height: 26px; width: auto; margin-bottom: 14px; }
 .login-card .sub { color: var(--muted); margin: 0 0 20px; }
 .login-card button { width: 100%; margin-top: 6px; }
 

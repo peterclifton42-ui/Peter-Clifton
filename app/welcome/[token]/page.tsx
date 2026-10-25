@@ -19,6 +19,8 @@ export default async function WelcomePage({ params }: Props) {
     return (
       <main className="login-wrap">
         <div className="panel login-card">
+        {/* eslint-disable-next-line @next/next/no-img-element -- a small static SVG */}
+        <img className="login-logo" src="/curinos-logo.svg" alt="Curinos" width={117} height={26} />
           <h1>{APP_NAME}</h1>
           <p className="sub">{found.problem}</p>
           <p><Link href="/login/forgot">Get a new link</Link> or ask your admin to resend your invite.</p>
@@ -32,6 +34,8 @@ export default async function WelcomePage({ params }: Props) {
   return (
     <main className="login-wrap">
       <div className="panel login-card">
+        {/* eslint-disable-next-line @next/next/no-img-element -- a small static SVG */}
+        <img className="login-logo" src="/curinos-logo.svg" alt="Curinos" width={117} height={26} />
         <h1>{invite ? `Welcome to ${APP_NAME}` : "Choose a new password"}</h1>
         <p className="sub">
           {invite ? "Choose a password to finish setting up your account." : "Choose a new password for your account."}
