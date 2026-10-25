@@ -3,7 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./lib/supabase/config";
 
 // Runs before every page: refreshes the login session and sends anyone who is
-// not signed in to /login. The scheduler's email endpoints check their own secret.
+// not signed in to /login (password links under /welcome/ excepted). The
+// scheduler's email endpoints check their own secret.
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -23,9 +24,12 @@ export async function proxy(request: NextRequest) {
 
   const { data } = await supabase.auth.getClaims();
   const signedIn = Boolean(data?.claims?.sub);
-  const onLogin = request.nextUrl.pathname.startsWith("/login");
+  const path = request.nextUrl.pathname;
+  const onLogin = path.startsWith("/login");
+  // Invite and reset links work whether or not someone is signed in.
+  const onWelcome = path.startsWith("/welcome/");
 
-  if (!signedIn && !onLogin) {
+  if (!signedIn && !onLogin && !onWelcome) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = "";

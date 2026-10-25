@@ -9,7 +9,7 @@ export default function LoginPage() {
     <main className="login-wrap">
       <div className="panel login-card">
         <h1>{APP_NAME}</h1>
-        <p className="sub">Sign in with the account your admin created for you.</p>
+        <p className="sub">Sign in with the email your invite was sent to.</p>
         <LoginForm />
       </div>
     </main>

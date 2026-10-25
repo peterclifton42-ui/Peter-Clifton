@@ -1,27 +1,32 @@
 "use server";
 
-import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { createLink, emailLink, type LinkKind } from "@/lib/accounts";
 import { requireAdmin } from "@/lib/auth";
 import { sendPreview } from "@/lib/email/jobs";
 import { emailConfigured } from "@/lib/email/send";
 import { adminConfigured, createAdminClient } from "@/lib/supabase/admin";
 
-export type AdminState = { error?: string; created?: { email: string; password: string } } | undefined;
+export type AdminState = {
+  error?: string;
+  // The link went out by email (emailed) or must be passed on by hand (emailError).
+  link?: { email: string; kind: LinkKind; url: string; emailed: boolean; emailError?: string };
+} | undefined;
 
 const ROLES = ["pending", "seller", "admin"] as const;
 
 const NO_KEY = "Logins can't be managed until SUPABASE_SECRET_KEY is added in Vercel (see the note above).";
 
-// Readable temporary password: no characters that are easy to confuse.
-function temporaryPassword() {
-  const alphabet = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const bytes = randomBytes(14);
-  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
+async function sendLink(userId: string, email: string, name: string | null, kind: LinkKind, invitedBy: { id: string; name: string | null }) {
+  const admin = createAdminClient();
+  const url = await createLink(admin, userId, kind, invitedBy.id);
+  const emailError = await emailLink(admin, { to: email, name, kind, url, invitedBy: invitedBy.name });
+  return { email, kind, url, emailed: !emailError, emailError: emailError ?? undefined };
 }
 
+// Creates the login (with no usable password) and sends a link to set one.
 export async function createUser(_prev: AdminState, formData: FormData): Promise<AdminState> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const fullName = String(formData.get("full_name") ?? "").trim();
   const role = String(formData.get("role") ?? "seller");
@@ -30,20 +35,24 @@ export async function createUser(_prev: AdminState, formData: FormData): Promise
   if (!adminConfigured()) return { error: NO_KEY };
 
   const admin = createAdminClient();
-  const password = temporaryPassword();
   const { data, error } = await admin.auth.admin.createUser({
     email,
-    password,
     email_confirm: true,
     user_metadata: { full_name: fullName || null },
   });
-  if (error || !data.user) return { error: error?.message ?? "Couldn't create the user." };
+  if (error || !data.user) {
+    return { error: /already/i.test(error?.message ?? "") ? `${email} already has a login. Use "Resend invite" or "Send reset link" on their row below.` : error?.message ?? "Couldn't create the user." };
+  }
 
   const { error: roleError } = await admin.from("profiles").update({ role }).eq("id", data.user.id);
   if (roleError) return { error: `User created, but setting their role failed: ${roleError.message}` };
 
   revalidatePath("/admin");
-  return { created: { email, password } };
+  try {
+    return { link: await sendLink(data.user.id, email, fullName || null, "invite", { id: viewer.id, name: viewer.fullName }) };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 export async function setRole(formData: FormData) {
@@ -57,15 +66,20 @@ export async function setRole(formData: FormData) {
   revalidatePath("/admin");
 }
 
-export async function resetPassword(_prev: AdminState, formData: FormData): Promise<AdminState> {
-  await requireAdmin();
+// A fresh invite for someone who has never signed in, otherwise a reset link.
+export async function sendPasswordLink(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  const viewer = await requireAdmin();
   const id = String(formData.get("id"));
-  const email = String(formData.get("email"));
   if (!adminConfigured()) return { error: NO_KEY };
-  const password = temporaryPassword();
-  const { error } = await createAdminClient().auth.admin.updateUserById(id, { password });
-  if (error) return { error: error.message };
-  return { created: { email, password } };
+  const { data, error } = await createAdminClient().auth.admin.getUserById(id);
+  if (error || !data.user?.email) return { error: error?.message ?? "User not found." };
+  const kind: LinkKind = data.user.last_sign_in_at ? "reset" : "invite";
+  const name = (data.user.user_metadata?.full_name as string | undefined) ?? null;
+  try {
+    return { link: await sendLink(id, data.user.email, name, kind, { id: viewer.id, name: viewer.fullName }) };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 export async function removeUser(formData: FormData) {

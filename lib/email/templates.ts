@@ -28,7 +28,13 @@ function itemHtml(item: Item) {
   </td></tr>`;
 }
 
-export function renderEmail(opts: { preheader: string; heading: string; intro: string; sections: Section[] }) {
+// The button and footer default to the alert emails'; account emails pass their own.
+export function renderEmail(opts: {
+  preheader: string; heading: string; intro: string; sections: Section[];
+  button?: { label: string; url: string }; footer?: string;
+}) {
+  const button = opts.button ?? { label: `Open ${APP_NAME}`, url: `${APP_URL}/` };
+  const footer = opts.footer;
   const sections = opts.sections.filter((s) => s.items.length || s.empty).map((s) => `
     <h2 style="font-size:15px;color:#111827;margin:24px 0 4px">${esc(s.heading)}</h2>
     ${s.items.length
@@ -44,8 +50,8 @@ export function renderEmail(opts: { preheader: string; heading: string; intro: s
   <h1 style="font-size:20px;color:#111827;margin:6px 0 8px">${esc(opts.heading)}</h1>
   <p style="color:#374151;font-size:14px;margin:0">${esc(opts.intro)}</p>
   ${sections}
-  <p style="margin:28px 0 0"><a href="${APP_URL}/" style="background:#2563eb;color:#ffffff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">Open ${APP_NAME}</a></p>
-  <p style="color:#9ca3af;font-size:12px;margin:24px 0 0">You get this because you follow these banks. <a href="${APP_URL}/account" style="color:#6b7280">Change your email settings</a>.</p>
+  <p style="margin:28px 0 0"><a href="${esc(button.url)}" style="background:#2563eb;color:#ffffff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">${esc(button.label)}</a></p>
+  <p style="color:#9ca3af;font-size:12px;margin:24px 0 0">${footer != null ? esc(footer) : `You get this because you follow these banks. <a href="${APP_URL}/account" style="color:#6b7280">Change your email settings</a>.`}</p>
 </td></tr></table></td></tr></table></body></html>`;
 
   const text = [
@@ -56,7 +62,7 @@ export function renderEmail(opts: { preheader: string; heading: string; intro: s
         ? s.items.map((i) => `- ${i.title}${i.meta ? ` (${i.meta})` : ""}${i.body ? `\n  ${i.body}` : ""}${absolute(i.link) ? `\n  ${absolute(i.link)}` : ""}`)
         : [s.empty!]),
     ]),
-    "", `Open ${APP_NAME}: ${APP_URL}/`, `Change your email settings: ${APP_URL}/account`,
+    "", `${button.label}: ${button.url}`, footer ?? `Change your email settings: ${APP_URL}/account`,
   ].join("\n");
 
   return { html, text };

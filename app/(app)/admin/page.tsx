@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { requireAdmin } from "@/lib/auth";
 import { askConfigured } from "@/lib/ask/agent";
 import { emailConfigured } from "@/lib/email/send";
-import { adminConfigured } from "@/lib/supabase/admin";
+import { adminConfigured, createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { CreateUserForm, EmailPreviewForm, UserRow } from "./forms";
 
@@ -23,6 +23,12 @@ export default async function AdminPage() {
     supabase.from("ask_log").select("id, user_id, question, comment, created_at")
       .eq("rating", -1).order("created_at", { ascending: false }).limit(8),
   ]);
+  // Who has signed in at least once (auth data, so it needs the secret key).
+  const signedIn = new Set<string>();
+  if (adminConfigured()) {
+    const { data: auth } = await createAdminClient().auth.admin.listUsers({ perPage: 500 });
+    (auth?.users ?? []).forEach((u) => { if (u.last_sign_in_at) signedIn.add(u.id); });
+  }
   const emailOf = new Map((users ?? []).map((u) => [u.id as string, (u.full_name || u.email) as string]));
   const askCost = (asks ?? []).reduce((sum, a) => sum + Number(a.cost_usd ?? 0), 0);
   const askUsers = new Set((asks ?? []).map((a) => a.user_id)).size;
@@ -35,7 +41,7 @@ export default async function AdminPage() {
       <div className="page-head">
         <div>
           <h1>Admin</h1>
-          <p>Create logins for sellers and manage who has access.</p>
+          <p>Invite sellers and manage who has access.</p>
         </div>
       </div>
 
@@ -47,8 +53,8 @@ export default async function AdminPage() {
       )}
 
       <div className="panel">
-        <h2>Add a seller</h2>
-        <p>The app creates the login and shows a temporary password to send them.</p>
+        <h2>Invite someone</h2>
+        <p>They get an email with a link to choose their own password. If the email can&apos;t be sent, you get the link to pass on yourself.</p>
         <CreateUserForm />
       </div>
 
@@ -141,7 +147,8 @@ export default async function AdminPage() {
       <div className="panel">
         <h2>People with access ({users?.length ?? 0})</h2>
         {(users ?? []).map((u) => (
-          <UserRow key={u.id} id={u.id} email={u.email} fullName={u.full_name} role={u.role} isSelf={u.id === viewer.id} />
+          <UserRow key={u.id} id={u.id} email={u.email} fullName={u.full_name} role={u.role} isSelf={u.id === viewer.id}
+            signedIn={!adminConfigured() || signedIn.has(u.id)} />
         ))}
       </div>
     </main>
