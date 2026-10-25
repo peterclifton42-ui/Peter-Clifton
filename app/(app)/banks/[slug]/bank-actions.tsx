@@ -1,0 +1,50 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { requestRefresh } from "./actions";
+
+export function RequestRefreshButton({ slug, requested }: { slug: string; requested: { byYou: boolean; at: string } | null }) {
+  const [pending, start] = useTransition();
+  if (requested) {
+    const day = new Date(requested.at).toLocaleDateString("en-US", { day: "numeric", month: "short" });
+    return (
+      <span className="meta" title="The refresh job runs at 00:07 and 12:07 UTC and takes requested banks first. You'll get an alert when it's live.">
+        ⟳ Refresh requested{requested.byYou ? " by you" : ""} {day} · next run takes it first
+      </span>
+    );
+  }
+  return (
+    <button type="button" className="ask-open secondary" disabled={pending} onClick={() => start(() => requestRefresh(slug))}
+      title="Puts this bank first in line for the next scheduled refresh (00:07 or 12:07 UTC).">
+      {pending ? "Requesting…" : "Request refresh"}
+    </button>
+  );
+}
+
+export function RefreshNewsButton({ slug }: { slug: string }) {
+  const router = useRouter();
+  const [state, setState] = useState<{ busy: boolean; message?: string; error?: boolean }>({ busy: false });
+
+  async function run() {
+    setState({ busy: true });
+    try {
+      const res = await fetch(`/api/news/${slug}`, { method: "POST" });
+      const body = await res.json().catch(() => ({ error: "Something went wrong." }));
+      if (!res.ok) return setState({ busy: false, message: body.error, error: true });
+      setState({ busy: false, message: body.added ? `Added ${body.added} new item${body.added === 1 ? "" : "s"}.` : "No new news found." });
+      router.refresh();
+    } catch {
+      setState({ busy: false, message: "The connection dropped. Try again.", error: true });
+    }
+  }
+
+  return (
+    <span className="news-refresh">
+      <button type="button" className="link" disabled={state.busy} onClick={run}>
+        {state.busy ? "Searching the web…" : "Refresh news"}
+      </button>
+      {state.message && <span className={state.error ? "bad" : "dim"}>{state.message}</span>}
+    </span>
+  );
+}

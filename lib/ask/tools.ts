@@ -6,6 +6,7 @@ import {
   INSIGHT_COLUMNS, angleResults, inScope, objectionResults, parseScope, productDemand, themeResults,
   type InsightInput,
 } from "../insights";
+import { compareDashboards } from "../changes";
 import { METRICS } from "../metrics";
 import { PRODUCTS, effectivePriority, productBySlug, productFor, sellerBlocks, statusLabel } from "../products";
 
@@ -98,13 +99,14 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "get_news",
-    description: "Recent news items collected weekly for institutions (headline, why it matters, publisher, date, URL). Filter to one institution, or the user's followed ones.",
+    description: "News items the app has collected (weekly job plus on-demand refreshes), kept permanently: headline, why it matters, publisher, date, URL. For one institution it returns the whole history by default, so you can describe how the story has developed. Filter by keyword (e.g. 'merger', 'CEO', 'deposit') or to the user's followed institutions.",
     input_schema: {
       type: "object",
       properties: {
         slug: { type: "string" },
         followed_only: { type: "boolean" },
-        days: { type: "integer", description: "How far back, default 30." },
+        query: { type: "string", description: "Keyword to match in headline or summary." },
+        days: { type: "integer", description: "How far back. Default: all history for one institution, 30 days otherwise." },
       },
       additionalProperties: false,
     },
@@ -133,6 +135,16 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
         quarters: { type: "integer", description: "How many recent quarters, default 4." },
       },
       required: ["slugs"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "get_dashboard_history",
+    description: "Every version of one institution's dashboard (research date, quarter, source) and what changed between consecutive versions: headline metrics, opportunity and health ratings, sales theme, product priorities and new news. Use it for 'what has changed', trends over quarters, or how the pitch has moved.",
+    input_schema: {
+      type: "object",
+      properties: { slug: { type: "string" } },
+      required: ["slug"],
       additionalProperties: false,
     },
   },
@@ -186,6 +198,7 @@ const TOOL_LABELS: Record<string, (input: Record<string, unknown>) => string> = 
   get_news: (i) => (i.slug ? `Checking news for ${i.slug}` : "Checking recent news"),
   get_calendar: () => "Checking the earnings calendar",
   get_official_metrics: () => "Pulling call report figures",
+  get_dashboard_history: (i) => `Reading the version history of ${i.slug}`,
   get_market_insights: (i) => (i.theme ? `Reading the evidence for “${i.theme}”` : "Reading market insights"),
   get_product: (i) => `Looking up ${i.product}`,
 };
@@ -250,13 +263,18 @@ export async function runTool(name: string, rawInput: unknown, ctx: Ctx): Promis
     }
 
     case "get_news": {
-      const days = Math.min(Math.max(Number(input.days) || 30, 1), 365);
+      const days = Math.min(Math.max(Number(input.days) || (str(input.slug) ? 3650 : 30), 1), 3650);
       let q = ctx.db.from("news_items").select("slug, published_on, headline, summary, source_name, url")
-        .gte("published_on", addDays(todayISO(), -days)).order("published_on", { ascending: false }).limit(80);
+        .gte("published_on", addDays(todayISO(), -days)).order("published_on", { ascending: false }).limit(150);
       if (str(input.slug)) q = q.eq("slug", str(input.slug)!);
       else if (bool(input.followed_only)) q = q.in("slug", [...(await followed(ctx))]);
+      const term = str(input.query)?.replace(/[%,()]/g, " ");
+      if (term) q = q.or(`headline.ilike.%${term}%,summary.ilike.%${term}%`);
       const { data } = await q;
-      return clip({ days, items: data ?? [], note: "News is collected weekly; each dashboard also has its own news section (get_dashboard sections ['news'])." });
+      return clip({
+        days, items: data ?? [],
+        note: "Collected weekly and on demand (\"Refresh news\" on a bank page); history is kept. Each dashboard also has its own research-time news (get_dashboard sections ['news']). Full list: /banks/<slug>/news.",
+      });
     }
 
     case "get_calendar": {
@@ -285,6 +303,19 @@ export async function runTool(name: string, rawInput: unknown, ctx: Ctx): Promis
       }));
       const definitions = Object.fromEntries(Object.entries(METRICS).map(([k, m]) => [k, `${m.label} (${m.unit}): ${m.definition}`]));
       return clip({ compare_page: `/compare?ids=${slugs.slice(0, 6).join(",")}`, definitions, institutions: bySlug });
+    }
+
+    case "get_dashboard_history": {
+      const slug = str(input.slug);
+      if (!slug) return "Error: slug is required.";
+      const { data: snaps } = await ctx.db.from("snapshots")
+        .select("id, quarter, source, loaded_at, data").eq("slug", slug).order("loaded_at");
+      if (!snaps?.length) return `No dashboard versions for "${slug}".`;
+      const versions = snaps.map((s, i) => ({
+        version: i + 1, researched_at: s.loaded_at, quarter: s.quarter, source: s.source,
+        ...(i > 0 ? { changes_from_previous: compareDashboards(snaps[i - 1].data, s.data) } : {}),
+      }));
+      return clip({ slug, versions, page: `/banks/${slug}/changes` });
     }
 
     case "get_market_insights": {

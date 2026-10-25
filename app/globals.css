@@ -436,3 +436,11 @@ ul.plain { padding-left: 18px; display: grid; gap: 4px; font-size: 13px; }
 .drawer .ask { flex: 1; min-height: 0; }
 .drawer-head { display: flex; justify-content: space-between; align-items: center; color: var(--text-strong); }
 .page-head .ask-open { align-self: flex-start; }
+
+/* Refresh buttons and news history */
+.news-refresh { display: inline-flex; gap: 8px; align-items: center; }
+.news-refresh .bad, .bad { color: var(--bad); }
+ul.news-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+ul.news-list li { display: flex; flex-direction: column; gap: 2px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+ul.news-list li:last-child { border-bottom: 0; padding-bottom: 0; }
+ul.news-list p { margin: 2px 0 0; color: var(--text); }

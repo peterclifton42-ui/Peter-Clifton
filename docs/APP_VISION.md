@@ -279,3 +279,8 @@ Cost: Opus 5.5 at $4 / $20 per million tokens. A typical question makes two or t
 
 Not yet: live web search (it answers from the app only), and saved conversation history (each tab keeps its own conversation until closed).
 
+### After Phase 7 (25 Oct 2026)
+- **Request refresh** on out-of-date bank pages puts that bank first in the scheduled refresh queue. That job runs on the Claude plan; a full research refresh is too long and costly to run inside the app. Publishing alerts the requester.
+- **Refresh news** on every bank page: an immediate Claude API web search for the last 30 days, at about $0.20–0.40 a run.
+- **News history** page per bank. Ask can now search the full news history and each dashboard's version history ("what has changed since last quarter").
+
