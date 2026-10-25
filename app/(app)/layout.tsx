@@ -24,6 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Link href="/compare">Compare</Link>
             <Link href="/insights">Insights</Link>
             <Link href="/products">Products</Link>
+            <Link href="/ask">Ask</Link>
             <Link href="/alerts" aria-label={unread ? `Alerts, ${unread} unread` : "Alerts"}>
               Alerts{unread > 0 && <span className="count">{unread > 99 ? "99+" : unread}</span>}
             </Link>

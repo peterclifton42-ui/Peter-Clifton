@@ -7,6 +7,7 @@ import { formatAssets } from "@/lib/institutions";
 import { inScope, parseScope, type InsightInput } from "@/lib/insights";
 import { CATALOGUE_SOURCE, boldParts, effectivePriority, productBySlug, productFor, sellerBlocks, statusLabel } from "@/lib/products";
 import { createClient } from "@/lib/supabase/server";
+import { AskDrawer } from "../../ask/ask-chat";
 import { ScopeTabs } from "../../scope-tabs";
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ scope?: string }> };
@@ -62,6 +63,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
             Priority 1 or 2 at <b>{top.length}</b> of {rows.length} institutions{p3.length > 0 && <>, priority 3 at {p3.length}</>}.
           </p>
         </div>
+        <AskDrawer context={{ kind: "product", slug: product.slug, name: product.name }} />
       </div>
       {product.status === "roadmap" && (
         <div className="notice error">Coming soon on curinos.com and not yet available to buy. Mention it only as direction of travel, after an available product is in play.</div>

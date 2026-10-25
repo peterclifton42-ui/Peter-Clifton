@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { requireAdmin } from "@/lib/auth";
+import { askConfigured } from "@/lib/ask/agent";
 import { emailConfigured } from "@/lib/email/send";
 import { adminConfigured } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -10,14 +11,23 @@ export const metadata: Metadata = { title: "Admin" };
 export default async function AdminPage() {
   const viewer = await requireAdmin();
   const supabase = await createClient();
-  const [{ data: users }, { data: runs }, { data: institutions }, { data: emails }] = await Promise.all([
+  const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString();
+  const [{ data: users }, { data: runs }, { data: institutions }, { data: emails }, { data: asks }, { data: flagged }] = await Promise.all([
     supabase.from("profiles").select("id, email, full_name, role, created_at").order("created_at"),
     supabase.from("refresh_runs").select("id, job, slug, started_at, finished_at, status, note")
       .order("started_at", { ascending: false }).limit(12),
     supabase.from("institutions").select("slug, name"),
     supabase.from("email_log").select("id, job, recipient, subject, status, error, created_at")
       .order("created_at", { ascending: false }).limit(10),
+    supabase.from("ask_log").select("user_id, cost_usd, status, rating").gte("created_at", monthStart),
+    supabase.from("ask_log").select("id, user_id, question, comment, created_at")
+      .eq("rating", -1).order("created_at", { ascending: false }).limit(8),
   ]);
+  const emailOf = new Map((users ?? []).map((u) => [u.id as string, (u.full_name || u.email) as string]));
+  const askCost = (asks ?? []).reduce((sum, a) => sum + Number(a.cost_usd ?? 0), 0);
+  const askUsers = new Set((asks ?? []).map((a) => a.user_id)).size;
+  const askErrors = (asks ?? []).filter((a) => a.status === "error").length;
+  const ratings = (asks ?? []).filter((a) => a.rating != null);
   const names = new Map((institutions ?? []).map((i) => [i.slug as string, i.name as string]));
 
   return (
@@ -95,6 +105,36 @@ export default async function AdminPage() {
               </tbody>
             </table>
           </div>
+        )}
+      </div>
+
+      <div className="panel">
+        <h2>Ask assistant</h2>
+        {!askConfigured() ? (
+          <div className="notice info">
+            The assistant isn&apos;t switched on. Add <code>ANTHROPIC_API_KEY</code> (from console.anthropic.com) in Vercel → Settings →
+            Environment Variables and redeploy. Set a monthly spend limit in the Anthropic console too.
+          </div>
+        ) : (
+          <p>
+            This month: <b>{asks?.length ?? 0}</b> questions from {askUsers} {askUsers === 1 ? "person" : "people"}, about{" "}
+            <b>${askCost.toFixed(2)}</b> of Claude API usage{askErrors > 0 && <>, {askErrors} failed</>}.
+            {ratings.length > 0 && <> {ratings.filter((r) => r.rating === 1).length} 👍 · {ratings.filter((r) => r.rating === -1).length} 👎.</>}
+            {" "}Each person can ask up to {Number(process.env.ASK_DAILY_LIMIT) || 40} questions in 24 hours.
+          </p>
+        )}
+        {(flagged ?? []).length > 0 && (
+          <>
+            <h3>Answers marked 👎</h3>
+            <ul className="plain">
+              {(flagged ?? []).map((f) => (
+                <li key={f.id}>
+                  <b>{f.question}</b>
+                  <span className="dim"> — {emailOf.get(f.user_id) ?? "someone"}, {new Date(f.created_at).toLocaleDateString("en-US", { day: "numeric", month: "short" })}{f.comment ? `: “${f.comment}”` : ""}</span>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </div>
 

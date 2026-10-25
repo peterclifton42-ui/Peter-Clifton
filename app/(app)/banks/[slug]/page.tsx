@@ -8,6 +8,7 @@ import { followedSlugs } from "@/lib/follows";
 import { categoryLabel, formatAssets, shortQuarter, INSTITUTION_COLUMNS, type Institution } from "@/lib/institutions";
 import { createClient } from "@/lib/supabase/server";
 import { suggestPeers } from "@/lib/metrics";
+import { AskDrawer } from "../../ask/ask-chat";
 import { FollowButton } from "../../follow-button";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -68,6 +69,7 @@ export default async function BankPage({ params }: Props) {
         ) : null}
         {(versions ?? 0) > 1 && <Link href={`/banks/${slug}/changes`}>What changed since the last version →</Link>}
         <Link href={`/compare?ids=${[slug, ...suggestPeers(slug, all ?? [])].join(",")}`}>Compare with peers →</Link>
+        <AskDrawer context={{ kind: "bank", slug, name: institution.name }} />
       </div>
       {news && news.length > 0 && (
         <div className="news-strip">
