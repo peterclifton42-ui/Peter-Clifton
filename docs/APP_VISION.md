@@ -238,3 +238,14 @@ Built:
 
 Needs: a Resend API key in Vercel (`RESEND_API_KEY`). Until a sending domain is verified in Resend, email only reaches the Resend account owner, which is enough for a personal pilot. Sending to sellers at their work addresses needs a verified domain (`EMAIL_FROM`). The same domain can later send Supabase password-reset emails.
 
+### Phase 5 status (25 Oct 2026)
+Built:
+- **Compare** (`/compare`, in the menu, and "Compare with peers" on every bank page): up to six banks and credit unions side by side. It shows a latest-quarter table with the group median and the best value marked, and a trend chart per metric over eight quarters, with hover.
+- **Metrics:** the default five (NIM, cost of deposits, loan-to-deposit or loan-to-share, one-year deposit growth, efficiency). Return on assets, total assets and total deposits can be switched on. This is a first step towards each seller choosing their own metrics, though the choice isn't saved yet.
+- **Suggested peers:** the four institutions of the same type closest in size, as a starting point.
+- **Metric dictionary** on the page: what each figure means and exactly how it's calculated for banks and for credit unions, plus which FDIC certificates or NCUA charter each institution's figures come from.
+
+Data: official call reports rather than the dashboards' own cards, whose labels and definitions vary. Banks come from the FDIC API, summing every bank charter the holding company owns: Wintrust's 16 charters count as one $74.8B group, not its $9.6B lead bank. Credit unions come from NCUA quarterly files. Figures are to Q2 2026; Q3 arrives around 30 October (FDIC) and late November (NCUA), and the weekly job reloads them. Checking the IDs found two wrong FDIC numbers in the dashboards themselves: First Merchants (2871 belongs to a closed Idaho bank; the right one is 4365) and BOK Financial (26354 closed in 1992; the right one is 4214).
+
+Known limits: deposit growth includes acquisitions (flagged † when 40% or more). Credit union margin is measured against assets, as NCUA does, so it reads slightly lower than a bank's. Holding companies are measured on their bank charters only.
+

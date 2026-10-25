@@ -36,8 +36,12 @@ Add each item:
 
 Never invent a figure, and never add an item without a working source URL.
 
+## Part 3 — Official figures for Compare (no web calls)
+
+`python3 pipeline/regulatory.py` reloads the last nine quarters of FDIC and NCUA call report figures for every institution in `pipeline/regulatory-ids.csv`. It must end with `LOADED`. A new quarter appears on its own about a month after quarter end (FDIC) or two months after (NCUA). If it reports a certificate as not found, say so in the summary; don't edit the file.
+
 ## Finish
 
-`python3 pipeline/db.py finish <RUN ID> done "Calendar: <n> confirmed, <n> marked reported, <n> next-quarter rows. News: <n> items for <n> institutions. <calls> calls."`
+`python3 pipeline/db.py finish <RUN ID> done "Calendar: <n> confirmed, <n> marked reported, <n> next-quarter rows. News: <n> items for <n> institutions. Compare figures to <latest quarter>. <calls> calls."`
 
 If anything fails, run `python3 pipeline/db.py finish <RUN ID> failed "<step>: <exact error>"` and say so plainly in your final message.

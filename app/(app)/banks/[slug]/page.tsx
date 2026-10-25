@@ -7,6 +7,7 @@ import { addDays, EVENT_COLUMNS, formatDay, latestAndNext, needsRefresh, todayIS
 import { followedSlugs } from "@/lib/follows";
 import { categoryLabel, formatAssets, shortQuarter, INSTITUTION_COLUMNS, type Institution } from "@/lib/institutions";
 import { createClient } from "@/lib/supabase/server";
+import { suggestPeers } from "@/lib/metrics";
 import { FollowButton } from "../../follow-button";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -35,13 +36,14 @@ export default async function BankPage({ params }: Props) {
   const viewer = await requireViewer();
   const supabase = await createClient();
   const today = todayISO();
-  const [{ data: snapshot }, { data: events }, followed, { count: versions }, { data: news }] = await Promise.all([
+  const [{ data: snapshot }, { data: events }, followed, { count: versions }, { data: news }, { data: all }] = await Promise.all([
     supabase.from("snapshots").select("data, loaded_at").eq("id", institution.current_snapshot_id).single(),
     supabase.from("earnings_events").select(EVENT_COLUMNS).eq("slug", slug),
     followedSlugs(viewer.id),
     supabase.from("snapshots").select("id", { count: "exact", head: true }).eq("slug", slug),
     supabase.from("news_items").select("published_on, headline, source_name, url").eq("slug", slug)
       .gte("published_on", addDays(today, -30)).order("published_on", { ascending: false }).limit(3),
+    supabase.from("institutions").select("slug, category, assets_b"),
   ]);
   if (!snapshot) notFound();
   const { latest, next } = latestAndNext((events ?? []) as EarningsEvent[], today).get(slug) ?? {};
@@ -65,6 +67,7 @@ export default async function BankPage({ params }: Props) {
           <span className="meta">Next results {formatDay(next.event_date)}{next.status === "estimated" ? " (estimated)" : ""}</span>
         ) : null}
         {(versions ?? 0) > 1 && <Link href={`/banks/${slug}/changes`}>What changed since the last version →</Link>}
+        <Link href={`/compare?ids=${[slug, ...suggestPeers(slug, all ?? [])].join(",")}`}>Compare with peers →</Link>
       </div>
       {news && news.length > 0 && (
         <div className="news-strip">

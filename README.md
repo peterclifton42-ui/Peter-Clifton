@@ -21,6 +21,10 @@ Roles: **pending** (signed up but no access), **seller** (can see everything), *
 2. **Turn off public sign-up.** In Supabase: *Authentication → Sign In / Providers → Email*, switch off *Allow new users to sign up*. (Anyone who did sign up would only ever be "pending" with no access, but this closes the door entirely.)
 3. **Email (Resend).** In Resend (resend.com): *API Keys → Create API key* with "Sending access". In Vercel add `RESEND_API_KEY` with that value, then redeploy. Until a domain is verified in Resend, email can only go to the Resend account's own address. After verifying a domain, also add `EMAIL_FROM`, for example `Bank Intelligence <alerts@yourdomain.com>`. Admin → Email has buttons to send yourself a test email and this week's digest.
 
+## Compare
+
+`/compare` puts up to six institutions side by side on official call report figures, held in `regulatory_metrics`. `pipeline/regulatory.py` loads them (the weekly job runs it): FDIC BankFind for banks, adding up every active charter the holding company owns, and NCUA's quarterly 5300 files for credit unions. Which filing belongs to which institution is in `pipeline/regulatory-ids.csv`; add a row there when a new institution is added. The metric definitions are in `lib/metrics.ts` and shown on the page.
+
 ## Alerts and email
 
 - The database records an alert for each follower when a dashboard is republished, results are marked reported, or news is added (triggers on `institutions`, `earnings_events` and `news_items`). They show under **Alerts** in the app.
