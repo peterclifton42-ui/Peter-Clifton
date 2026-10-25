@@ -471,3 +471,8 @@ ul.news-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px
 ul.news-list li { display: flex; flex-direction: column; gap: 2px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
 ul.news-list li:last-child { border-bottom: 0; padding-bottom: 0; }
 ul.news-list p { margin: 2px 0 0; color: var(--text); }
+
+/* Invite links */
+.copy-link { display: flex; gap: 8px; margin: 8px 0 4px; }
+.copy-link input { flex: 1; min-width: 0; font-family: ui-monospace, monospace; font-size: 12px; }
+.user-row .who .badge { margin-top: 4px; }

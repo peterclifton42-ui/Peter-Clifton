@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { signIn } from "./actions";
 
@@ -17,6 +18,7 @@ export function LoginForm() {
         <input id="password" name="password" type="password" autoComplete="current-password" required />
       </div>
       <button type="submit" disabled={pending}>{pending ? "Signing in…" : "Sign in"}</button>
+      <p className="dim" style={{ marginTop: 14, textAlign: "center" }}><Link href="/login/forgot">Forgot your password?</Link></p>
     </form>
   );
 }

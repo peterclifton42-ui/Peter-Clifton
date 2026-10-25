@@ -1,17 +1,24 @@
 "use client";
 
 import { useActionState } from "react";
-import { createUser, removeUser, resetPassword, sendEmailPreview, setRole, type AdminState } from "./actions";
+import { createUser, removeUser, sendEmailPreview, sendPasswordLink, setRole, type AdminState } from "./actions";
 
-function PasswordToShare({ state }: { state: AdminState }) {
+function LinkResult({ state }: { state: AdminState }) {
   if (state?.error) return <div className="notice error">{state.error}</div>;
-  if (!state?.created) return null;
+  if (!state?.link) return null;
+  const { email, kind, url, emailed, emailError } = state.link;
+  const what = kind === "invite" ? "invite" : "password reset link";
+  if (emailed) {
+    return <div className="notice ok">Sent the {what} to {email}. {kind === "invite" ? "The link works for 7 days." : "The link works for 2 hours."}</div>;
+  }
   return (
-    <div className="notice ok">
-      Temporary password for {state.created.email}:{" "}
-      <span className="temp-password">{state.created.password}</span>
-      <br />
-      Send it to them privately. It is shown only once; they can change it under their name, top right.
+    <div className="notice info">
+      Couldn&apos;t email {email}, so send them this {what} yourself (it works {kind === "invite" ? "for 7 days" : "for 2 hours"}, once):
+      <div className="copy-link">
+        <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} aria-label="Link to send" />
+        <button type="button" className="secondary" onClick={() => navigator.clipboard?.writeText(url)}>Copy</button>
+      </div>
+      <span className="dim">Why: {emailError}</span>
     </div>
   );
 }
@@ -20,7 +27,7 @@ export function CreateUserForm() {
   const [state, action, pending] = useActionState(createUser, undefined);
   return (
     <form action={action}>
-      <PasswordToShare state={state} />
+      <LinkResult state={state} />
       <div className="row">
         <div className="field">
           <label htmlFor="full_name">Name</label>
@@ -37,22 +44,23 @@ export function CreateUserForm() {
             <option value="admin">Admin</option>
           </select>
         </div>
-        <button type="submit" disabled={pending}>{pending ? "Creating…" : "Create login"}</button>
+        <button type="submit" disabled={pending}>{pending ? "Sending…" : "Send invite"}</button>
       </div>
     </form>
   );
 }
 
-type UserRowProps = { id: string; email: string; fullName: string | null; role: string; isSelf: boolean };
+type UserRowProps = { id: string; email: string; fullName: string | null; role: string; isSelf: boolean; signedIn: boolean };
 
-export function UserRow({ id, email, fullName, role, isSelf }: UserRowProps) {
-  const [state, resetAction, resetting] = useActionState(resetPassword, undefined);
+export function UserRow({ id, email, fullName, role, isSelf, signedIn }: UserRowProps) {
+  const [state, linkAction, sending] = useActionState(sendPasswordLink, undefined);
   return (
     <div>
       <div className="user-row">
         <div className="who">
           <strong>{fullName || email}</strong>
           {fullName && <span className="dim">{email}</span>}
+          {!signedIn && <span className="badge status-estimated">Invited · not signed in yet</span>}
         </div>
         <form action={setRole}>
           <input type="hidden" name="id" value={id} />
@@ -63,10 +71,11 @@ export function UserRow({ id, email, fullName, role, isSelf }: UserRowProps) {
           </select>
           {!isSelf && <button type="submit" className="secondary">Save role</button>}
         </form>
-        <form action={resetAction}>
+        <form action={linkAction}>
           <input type="hidden" name="id" value={id} />
-          <input type="hidden" name="email" value={email} />
-          <button type="submit" className="secondary" disabled={resetting}>Reset password</button>
+          <button type="submit" className="secondary" disabled={sending}>
+            {sending ? "Sending…" : signedIn ? "Send reset link" : "Resend invite"}
+          </button>
         </form>
         {!isSelf && (
           <form
@@ -78,7 +87,7 @@ export function UserRow({ id, email, fullName, role, isSelf }: UserRowProps) {
           </form>
         )}
       </div>
-      <PasswordToShare state={state} />
+      <LinkResult state={state} />
     </div>
   );
 }
