@@ -25,6 +25,13 @@ Roles: **pending** (signed up but no access), **seller** (can see everything), *
 
 `/compare` puts up to six institutions side by side on official call report figures, held in `regulatory_metrics`. `pipeline/regulatory.py` loads them (the weekly job runs it): FDIC BankFind for banks, adding up every active charter the holding company owns, and NCUA's quarterly 5300 files for credit unions. Which filing belongs to which institution is in `pipeline/regulatory-ids.csv`; add a row there when a new institution is added. The metric definitions are in `lib/metrics.ts` and shown on the page.
 
+## Insights and Products
+
+- `/insights` reads every current dashboard together (the `insight_inputs` view): 15 market themes counted by where they come up (SWOT threats and opportunities, strategy pillars, "now" sales timing), product demand, the most common lead angle, and the objections sellers meet with the rebuttals the playbooks give. Themes and objection types are keyword rules in `lib/insights.ts`; every count opens to the sentences behind it.
+- `/products` and `/products/<product>` list every catalogue product with its target list (priority 1–2, ranked by fit, with each dashboard's reasoning and opening line), priority 3, the institutions ruled out and why, objections and answers, and the seller-facing parts of the catalogue entry.
+- The catalogue's guardrails are applied in the app: roadmap and unlisted products are labelled and capped at priority 3, and UK-only products are not recommended to US institutions, even on dashboards written before catalogue V4.
+- The product list comes from `lib/catalogue.json`. After editing the catalogue, run `python3 pipeline/catalogue.py` and commit the JSON.
+
 ## Alerts and email
 
 - The database records an alert for each follower when a dashboard is republished, results are marked reported, or news is added (triggers on `institutions`, `earnings_events` and `news_items`). They show under **Alerts** in the app.
