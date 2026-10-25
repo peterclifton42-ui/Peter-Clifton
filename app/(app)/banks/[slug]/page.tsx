@@ -9,6 +9,7 @@ import { categoryLabel, formatAssets, shortQuarter, INSTITUTION_COLUMNS, type In
 import { createClient } from "@/lib/supabase/server";
 import { suggestPeers } from "@/lib/metrics";
 import { AskDrawer } from "../../ask/ask-chat";
+import { RefreshNewsButton, RequestRefreshButton } from "./bank-actions";
 import { FollowButton } from "../../follow-button";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -37,7 +38,7 @@ export default async function BankPage({ params }: Props) {
   const viewer = await requireViewer();
   const supabase = await createClient();
   const today = todayISO();
-  const [{ data: snapshot }, { data: events }, followed, { count: versions }, { data: news }, { data: all }] = await Promise.all([
+  const [{ data: snapshot }, { data: events }, followed, { count: versions }, { data: news }, { data: all }, { count: newsTotal }, { data: requests }] = await Promise.all([
     supabase.from("snapshots").select("data, loaded_at").eq("id", institution.current_snapshot_id).single(),
     supabase.from("earnings_events").select(EVENT_COLUMNS).eq("slug", slug),
     followedSlugs(viewer.id),
@@ -45,7 +46,11 @@ export default async function BankPage({ params }: Props) {
     supabase.from("news_items").select("published_on, headline, source_name, url").eq("slug", slug)
       .gte("published_on", addDays(today, -30)).order("published_on", { ascending: false }).limit(3),
     supabase.from("institutions").select("slug, category, assets_b"),
+    supabase.from("news_items").select("id", { count: "exact", head: true }).eq("slug", slug),
+    supabase.from("refresh_requests").select("requested_by, requested_at").eq("slug", slug).is("fulfilled_at", null)
+      .order("requested_at").limit(1),
   ]);
+  const request = requests?.[0] ? { byYou: requests[0].requested_by === viewer.id, at: requests[0].requested_at as string } : null;
   if (!snapshot) notFound();
   const { latest, next } = latestAndNext((events ?? []) as EarningsEvent[], today).get(slug) ?? {};
   const outOfDate = latest && needsRefresh(latest, snapshot.loaded_at);
@@ -63,7 +68,10 @@ export default async function BankPage({ params }: Props) {
           {new Date(snapshot.loaded_at).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
         </span>
         {outOfDate ? (
-          <span className="badge medium">{latest.period} results out {formatDay(latest.event_date)} · not yet in this dashboard</span>
+          <>
+            <span className="badge medium">{latest.period} results out {formatDay(latest.event_date)} · not yet in this dashboard</span>
+            <RequestRefreshButton slug={slug} requested={request} />
+          </>
         ) : next ? (
           <span className="meta">Next results {formatDay(next.event_date)}{next.status === "estimated" ? " (estimated)" : ""}</span>
         ) : null}
@@ -71,17 +79,17 @@ export default async function BankPage({ params }: Props) {
         <Link href={`/compare?ids=${[slug, ...suggestPeers(slug, all ?? [])].join(",")}`}>Compare with peers →</Link>
         <AskDrawer context={{ kind: "bank", slug, name: institution.name }} />
       </div>
-      {news && news.length > 0 && (
-        <div className="news-strip">
-          <span className="dim">Latest news</span>
-          {news.map((n) => (
-            <span key={n.headline}>
-              <span className="dim">{formatDay(n.published_on)}</span>{" "}
-              {n.url ? <a href={n.url} target="_blank" rel="noreferrer">{n.headline}</a> : n.headline}
-            </span>
-          ))}
-        </div>
-      )}
+      <div className="news-strip">
+        <span className="dim">{news && news.length > 0 ? "Latest news" : "No news in the last 30 days"}</span>
+        {(news ?? []).map((n) => (
+          <span key={n.headline}>
+            <span className="dim">{formatDay(n.published_on)}</span>{" "}
+            {n.url ? <a href={n.url} target="_blank" rel="noreferrer">{n.headline}</a> : n.headline}
+          </span>
+        ))}
+        <RefreshNewsButton slug={slug} />
+        {(newsTotal ?? 0) > 0 && <Link href={`/banks/${slug}/news`}>All news ({newsTotal}) →</Link>}
+      </div>
       {/* The dashboard runs in a sandbox with no access to this page or the login session. */}
       <iframe
         className="dashboard-frame"
