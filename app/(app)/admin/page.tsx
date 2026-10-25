@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { askConfigured } from "@/lib/ask/agent";
 import { emailConfigured } from "@/lib/email/send";
@@ -129,6 +130,7 @@ export default async function AdminPage() {
             {" "}Each person can ask up to {Number(process.env.ASK_DAILY_LIMIT) || 40} questions in 24 hours.
           </p>
         )}
+        <p><Link href="/admin/questions">See every question and answer →</Link></p>
         {(flagged ?? []).length > 0 && (
           <>
             <h3>Answers marked 👎</h3>

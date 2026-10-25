@@ -170,6 +170,7 @@ export function AskChat({ context, compact = false }: { context: ChatContext; co
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(input); } }}
         />
         <div className="ask-actions">
+          <span className="dim ask-privacy">Questions are saved so admins can improve the app.</span>
           {turns.length > 0 && !busy && <button type="button" className="link" onClick={() => setTurns([])}>New conversation</button>}
           {busy
             ? <button type="button" className="secondary" onClick={() => abort.current?.abort()}>Stop</button>
