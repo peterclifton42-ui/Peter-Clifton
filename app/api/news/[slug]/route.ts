@@ -36,8 +36,25 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     .eq("requested_by", userId).gte("started_at", new Date(Date.now() - 24 * 3600 * 1000).toISOString());
   if ((count ?? 0) >= DAILY_PER_PERSON) return NextResponse.json({ error: `You've refreshed news ${DAILY_PER_PERSON} times in 24 hours. Try again later.` }, { status: 429 });
 
-  const result = await refreshNews({
-    admin: createAdminClient(), slug, name: inst.name, isCreditUnion: inst.category === "credit_union", userId,
+  // A thorough search can take about a minute. Stream: a line straight away and
+  // every 10 seconds while it runs (connections that stay silent are cut off at
+  // about 30 seconds), then the result as the last line.
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (v: unknown) => { try { controller.enqueue(encoder.encode(`${JSON.stringify(v)}\n`)); } catch { /* browser left */ } };
+      send({ status: "searching" });
+      const tick = setInterval(() => send({ status: "searching" }), 10_000);
+      try {
+        const result = await refreshNews({
+          admin: createAdminClient(), slug, name: inst.name, isCreditUnion: inst.category === "credit_union", userId,
+        });
+        send(result.ok ? { done: true, ...result } : { done: true, error: result.error });
+      } finally {
+        clearInterval(tick);
+        try { controller.close(); } catch { /* already closed */ }
+      }
+    },
   });
-  return result.ok ? NextResponse.json(result) : NextResponse.json({ error: result.error }, { status: 502 });
+  return new Response(stream, { headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store" } });
 }

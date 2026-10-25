@@ -30,8 +30,16 @@ export function RefreshNewsButton({ slug }: { slug: string }) {
     setState({ busy: true });
     try {
       const res = await fetch(`/api/news/${slug}`, { method: "POST" });
-      const body = await res.json().catch(() => ({ error: "Something went wrong." }));
-      if (!res.ok) return setState({ busy: false, message: body.error, error: true });
+      if (!res.ok || !res.body) {
+        const body = await res.json().catch(() => ({ error: "Something went wrong." }));
+        return setState({ busy: false, message: body.error, error: true });
+      }
+      // Progress lines while it searches; the last line is the result.
+      const text = await res.text();
+      const lines = text.trim().split("\n").map((l) => { try { return JSON.parse(l); } catch { return null; } });
+      const body = lines.reverse().find((l) => l?.done);
+      if (!body) return setState({ busy: false, message: "The search didn't finish. Try again in a minute.", error: true });
+      if (body.error) return setState({ busy: false, message: body.error, error: true });
       setState({
         busy: false,
         message: body.added
@@ -40,14 +48,14 @@ export function RefreshNewsButton({ slug }: { slug: string }) {
       });
       router.refresh();
     } catch {
-      setState({ busy: false, message: "The connection dropped. Try again.", error: true });
+      setState({ busy: false, message: "The connection dropped. Check All news in a minute; the search may still finish.", error: true });
     }
   }
 
   return (
     <span className="news-refresh">
       <button type="button" className="link" disabled={state.busy} onClick={run}>
-        {state.busy ? "Searching the web…" : "Refresh news"}
+        {state.busy ? "Searching the web (up to a minute)…" : "Refresh news"}
       </button>
       {state.message && <span className={state.error ? "bad" : "dim"}>{state.message}</span>}
     </span>
