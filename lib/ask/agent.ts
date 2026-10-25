@@ -78,6 +78,8 @@ export async function runAsk(opts: {
         // If a safety classifier declines, the API retries on a suitable model itself.
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
+        // An organisation-wide key (not created inside a workspace) must name one.
+        ...(process.env.ANTHROPIC_WORKSPACE_ID ? { workspace_id: process.env.ANTHROPIC_WORKSPACE_ID } : {}),
       }, { signal: opts.signal });
       stream.on("text", (delta) => {
         result.answer += delta;
@@ -135,7 +137,12 @@ export async function runAsk(opts: {
     result.status = "error";
     if (e instanceof Anthropic.AuthenticationError) result.error = "The Claude API key was rejected. Check ANTHROPIC_API_KEY in Vercel.";
     else if (e instanceof Anthropic.RateLimitError) result.error = "The assistant is busy right now. Try again in a minute.";
-    else if (e instanceof Anthropic.APIError) result.error = `Claude API error ${e.status ?? ""}: ${e.message}`.trim();
+    else if (e instanceof Anthropic.BadRequestError && /workspace/i.test(e.message)) {
+      result.error = "The Claude API key isn't tied to a workspace. In Vercel, add ANTHROPIC_WORKSPACE_ID (the workspace ID from console.anthropic.com), or replace the key with one created inside a workspace, then redeploy.";
+    } else if (e instanceof Anthropic.APIError) {
+      const detail = (e.error as { error?: { message?: string } } | undefined)?.error?.message ?? e.message;
+      result.error = `Claude API error ${e.status ?? ""}: ${detail}`;
+    }
     else result.error = e instanceof Error ? e.message : String(e);
   }
 
