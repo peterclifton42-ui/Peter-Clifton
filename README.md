@@ -1,4 +1,4 @@
-# Bank Intelligence
+# Curinos FI Intelligence Hub
 
 A private website where Curinos sellers sign in, search the covered banks and credit unions, and open each one's sales-intelligence dashboard.
 
@@ -20,7 +20,7 @@ Roles: **pending** (signed up but no access), **seller** (can see everything), *
 1. **Admin key in Vercel.** In Supabase: *Project Settings → API Keys → Secret keys*, create or copy a secret key. In Vercel: *peter-clifton → Settings → Environment Variables*, add `SUPABASE_SECRET_KEY` with that value for Production and Preview, then redeploy. Without it, the admin screen can't create logins.
 2. **Turn off public sign-up.** In Supabase: *Authentication → Sign In / Providers → Email*, switch off *Allow new users to sign up*. (Anyone who did sign up would only ever be "pending" with no access, but this closes the door entirely.)
 3. **Ask assistant (Claude API).** At console.anthropic.com create an API key and set a monthly spend limit (Settings → Limits). In Vercel add `ANTHROPIC_API_KEY`, then redeploy. If the key was created at organisation level rather than inside a workspace, also add `ANTHROPIC_WORKSPACE_ID` (Console → Settings → Workspaces → the workspace → its ID). Optional: `ASK_DAILY_LIMIT` (questions per person per 24 hours, default 40).
-4. **Email (Resend).** In Resend (resend.com): *API Keys → Create API key* with "Sending access". In Vercel add `RESEND_API_KEY` with that value, then redeploy. Until a domain is verified in Resend, email can only go to the Resend account's own address. After verifying a domain, also add `EMAIL_FROM`, for example `Bank Intelligence <alerts@yourdomain.com>`. Admin → Email has buttons to send yourself a test email and this week's digest.
+4. **Email (Resend).** In Resend (resend.com): *API Keys → Create API key* with "Sending access". In Vercel add `RESEND_API_KEY` with that value, then redeploy. Until a domain is verified in Resend, email can only go to the Resend account's own address. After verifying a domain, also add `EMAIL_FROM`, for example `Curinos FI Intelligence Hub <alerts@yourdomain.com>`. Admin → Email has buttons to send yourself a test email and this week's digest.
 
 ## Compare
 
@@ -35,7 +35,7 @@ Roles: **pending** (signed up but no access), **seller** (can see everything), *
 
 ## Refresh buttons and news history
 
-- **Request full refresh** is on every bank page (next to the out-of-date badge when results are newer than the dashboard). It records a `refresh_requests` row. The scheduled refresh job (on the Claude plan, 00:07 and 12:07 UTC) takes requested institutions first. Publishing closes the request and alerts whoever asked.
+- **Refresh menu** on every bank page: *Refresh news* runs a web search now; *Request full refresh* asks for the whole dashboard to be re-researched. A full-refresh request records a `refresh_requests` row. The scheduled refresh job (on the Claude plan, 00:07 and 12:07 UTC) takes requested institutions first. Publishing closes the request and alerts whoever asked.
 - **Refresh news** on any bank page runs a web search through the Claude API (`lib/news/refresh.ts`): at most 5 searches and 6 items, roughly $0.25–0.45, logged in `news_refreshes` with what it found and why any item was rejected. It's limited to once every 3 hours per bank after a run that added news and 15 times a day per person. New items alert followers like any other news.
 - Collected news (weekly job and Refresh news) also appears in each dashboard's own **Recent News** tab, newest first, above the news the research found. `lib/news/merge.ts` adds it when the page is drawn; the stored dashboard isn't changed. Refresh news also records each item's type (earnings, strategy, digital, partnership or risk) and a sales angle, so it renders like the original cards.
 - News is never deleted. `/banks/<slug>/news` lists the whole history. The Ask assistant searches it (`get_news` with a keyword, or the full history for one bank) and reads each dashboard's version history (`get_dashboard_history`) to describe change over time.

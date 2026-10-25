@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { APP_NAME } from "@/lib/brand";
 import { requireViewer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -15,7 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <>
       <header className="topbar">
-        <Link href="/" className="brand">Bank Intelligence</Link>
+        <Link href="/" className="brand">{APP_NAME}</Link>
         {viewer.role !== "pending" && (
           <nav className="nav">
             <Link href="/">Home</Link>

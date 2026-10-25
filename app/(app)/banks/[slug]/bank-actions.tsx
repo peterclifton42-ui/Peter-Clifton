@@ -1,30 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { requestRefresh } from "./actions";
 
-export function RequestRefreshButton({ slug, requested }: { slug: string; requested: { byYou: boolean; at: string } | null }) {
-  const [pending, start] = useTransition();
-  if (requested) {
-    const day = new Date(requested.at).toLocaleDateString("en-US", { day: "numeric", month: "short" });
-    return (
-      <span className="meta" title="The refresh job runs at 00:07 and 12:07 UTC and takes requested banks first. You'll get an alert when it's live.">
-        ⟳ Full refresh requested{requested.byYou ? " by you" : ""} {day} · next run takes it first
-      </span>
-    );
-  }
-  return (
-    <button type="button" className="ask-open secondary" disabled={pending} onClick={() => start(() => requestRefresh(slug))}
-      title="Re-researches the whole dashboard (results, strategy, products, contacts). Puts this bank first in line for the next scheduled refresh at 00:07 or 12:07 UTC; you'll get an alert when it's live.">
-      {pending ? "Requesting…" : "Request full refresh"}
-    </button>
-  );
-}
+type NewsState = { busy: boolean; message?: string; error?: boolean };
 
-export function RefreshNewsButton({ slug }: { slug: string }) {
+// Runs an on-demand news search for one institution and reports the outcome.
+function useNewsRefresh(slug: string) {
   const router = useRouter();
-  const [state, setState] = useState<{ busy: boolean; message?: string; error?: boolean }>({ busy: false });
+  const [state, setState] = useState<NewsState>({ busy: false });
 
   async function run() {
     setState({ busy: true });
@@ -52,12 +37,64 @@ export function RefreshNewsButton({ slug }: { slug: string }) {
     }
   }
 
+  return { state, run };
+}
+
+export function RefreshNewsButton({ slug }: { slug: string }) {
+  const { state, run } = useNewsRefresh(slug);
   return (
     <span className="news-refresh">
       <button type="button" className="link" disabled={state.busy} onClick={run}>
         {state.busy ? "Searching the web (up to a minute)…" : "Refresh news"}
       </button>
       {state.message && <span className={state.error ? "bad" : "dim"}>{state.message}</span>}
+    </span>
+  );
+}
+
+// One "Refresh" menu on the bank page: a quick news search, or a request for the
+// whole dashboard to be re-researched by the next scheduled refresh.
+export function RefreshMenu({ slug, requested }: { slug: string; requested: { byYou: boolean; at: string } | null }) {
+  const news = useNewsRefresh(slug);
+  const [pending, start] = useTransition();
+  const menu = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const close = (e: MouseEvent) => {
+      if (menu.current?.open && !menu.current.contains(e.target as Node)) menu.current.open = false;
+    };
+    // A click inside the dashboard frame never reaches this page, but it does take focus from it.
+    const blur = () => { if (menu.current) menu.current.open = false; };
+    document.addEventListener("click", close, true);
+    window.addEventListener("blur", blur);
+    return () => { document.removeEventListener("click", close, true); window.removeEventListener("blur", blur); };
+  }, []);
+  const done = () => { if (menu.current) menu.current.open = false; };
+  const requestedOn = requested && new Date(requested.at).toLocaleDateString("en-US", { day: "numeric", month: "short" });
+
+  return (
+    <span className="refresh-menu-wrap">
+      {news.state.busy && <span className="dim">Searching for news (up to a minute)…</span>}
+      {!news.state.busy && news.state.message && <span className={news.state.error ? "bad" : "dim"}>{news.state.message}</span>}
+      <details className="menu" ref={menu}>
+        <summary className="tool-btn">⟳ Refresh</summary>
+        <div className="menu-list" role="menu">
+          <button type="button" role="menuitem" disabled={news.state.busy} onClick={() => { done(); news.run(); }}>
+            <b>Refresh news</b>
+            <span>Searches the web for the last 30 days. About a minute.</span>
+          </button>
+          {requested ? (
+            <div className="menu-note">
+              <b>Full refresh requested{requested.byYou ? " by you" : ""} {requestedOn}</b>
+              <span>The next scheduled run (00:07 or 12:07 UTC) takes it first. You&apos;ll get an alert when it&apos;s live.</span>
+            </div>
+          ) : (
+            <button type="button" role="menuitem" disabled={pending} onClick={() => start(async () => { await requestRefresh(slug); done(); })}>
+              <b>{pending ? "Requesting…" : "Request full refresh"}</b>
+              <span>Re-researches the whole dashboard at the next scheduled run (00:07 or 12:07 UTC).</span>
+            </button>
+          )}
+        </div>
+      </details>
     </span>
   );
 }

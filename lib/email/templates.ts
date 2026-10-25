@@ -1,5 +1,6 @@
 import "server-only";
 import { APP_URL } from "./send";
+import { APP_NAME } from "../brand";
 
 // Plain, email-client-safe HTML: tables and inline styles, light background.
 
@@ -39,11 +40,11 @@ export function renderEmail(opts: { preheader: string; heading: string; intro: s
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 12px"><tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:10px;padding:28px">
 <tr><td>
-  <div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#2563eb;text-transform:uppercase">Bank Intelligence</div>
+  <div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#2563eb;text-transform:uppercase">${APP_NAME}</div>
   <h1 style="font-size:20px;color:#111827;margin:6px 0 8px">${esc(opts.heading)}</h1>
   <p style="color:#374151;font-size:14px;margin:0">${esc(opts.intro)}</p>
   ${sections}
-  <p style="margin:28px 0 0"><a href="${APP_URL}/" style="background:#2563eb;color:#ffffff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">Open Bank Intelligence</a></p>
+  <p style="margin:28px 0 0"><a href="${APP_URL}/" style="background:#2563eb;color:#ffffff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">Open ${APP_NAME}</a></p>
   <p style="color:#9ca3af;font-size:12px;margin:24px 0 0">You get this because you follow these banks. <a href="${APP_URL}/account" style="color:#6b7280">Change your email settings</a>.</p>
 </td></tr></table></td></tr></table></body></html>`;
 
@@ -55,7 +56,7 @@ export function renderEmail(opts: { preheader: string; heading: string; intro: s
         ? s.items.map((i) => `- ${i.title}${i.meta ? ` (${i.meta})` : ""}${i.body ? `\n  ${i.body}` : ""}${absolute(i.link) ? `\n  ${absolute(i.link)}` : ""}`)
         : [s.empty!]),
     ]),
-    "", `Open Bank Intelligence: ${APP_URL}/`, `Change your email settings: ${APP_URL}/account`,
+    "", `Open ${APP_NAME}: ${APP_URL}/`, `Change your email settings: ${APP_URL}/account`,
   ].join("\n");
 
   return { html, text };

@@ -139,9 +139,30 @@ th.num { text-align: right; }
 .badge.role { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
 
 /* ---------- bank page ---------- */
-.bank-bar { display: flex; align-items: center; gap: 16px; padding: 10px 24px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+/* The bank page fills the window below the top bar; the dashboard scrolls inside its frame. */
+body:has(.bank-page) { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+.bank-page { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.bank-bar { display: flex; align-items: center; gap: 6px 14px; padding: 7px 24px; border-bottom: 1px solid var(--border); flex-wrap: wrap; font-size: 13px; }
+.bank-bar .back { color: var(--muted); }
 .bank-bar .meta { color: var(--subtle); font-size: 13px; }
-.dashboard-frame { display: block; width: 100%; height: calc(100vh - 106px); border: 0; background: var(--bg); }
+.bank-tools { margin-left: auto; display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; }
+.bank-tools > a { color: var(--muted); }
+.bank-tools > a:hover { color: var(--text-strong); }
+.bank-tools .follow, .bank-tools .ask-open, .tool-btn { padding: 4px 12px; font-size: 13px; height: 30px; }
+.dashboard-frame { display: block; width: 100%; flex: 1; min-height: 0; border: 0; background: var(--bg); }
+
+/* Refresh menu */
+.refresh-menu-wrap { display: inline-flex; align-items: center; gap: 10px; }
+.menu { position: relative; }
+.menu > summary { list-style: none; cursor: pointer; }
+.menu > summary::-webkit-details-marker { display: none; }
+.tool-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); border-radius: 8px; font-weight: 600; user-select: none; }
+.tool-btn:hover, .menu[open] > .tool-btn { background: var(--border); color: var(--text-strong); }
+.menu-list { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 290px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 16px 32px rgba(0, 0, 0, .5); padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+.menu-list button, .menu-note { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; width: 100%; background: none; color: var(--text); padding: 8px 10px; border-radius: 6px; font-weight: 400; white-space: normal; }
+.menu-list button:hover:not(:disabled) { background: var(--surface-2); }
+.menu-list b { color: var(--text-strong); font-size: 13px; }
+.menu-list span { color: var(--subtle); font-size: 12px; line-height: 1.4; white-space: normal; }
 
 /* ---------- admin ---------- */
 .user-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 0; border-bottom: 1px solid var(--border); }
@@ -157,8 +178,15 @@ th.num { text-align: right; }
   .topbar { padding: 10px 16px; gap: 12px; }
   .user { margin-left: 0; width: 100%; }
   .page { padding: 16px; }
-  .bank-bar { padding: 10px 16px; }
-  .dashboard-frame { height: calc(100vh - 150px); }
+  .bank-bar { padding: 8px 16px; }
+  .bank-tools { margin-left: 0; }
+  /* The menu spans the bar instead of hanging off its button. */
+  .bank-bar { position: relative; }
+  .bank-bar .menu { position: static; }
+  .bank-bar .menu-list { left: 16px; right: 16px; width: auto; top: calc(100% - 4px); }
+  /* On a phone the bars wrap, so the page scrolls and the dashboard gets most of the screen. */
+  body:has(.bank-page) { height: auto; overflow: visible; display: block; }
+  .dashboard-frame { flex: none; height: 88dvh; }
 }
 
 /* ---------- follow ---------- */
@@ -227,7 +255,6 @@ table.calendar td:nth-child(5) { width: 250px; }
 /* ---------- phase 3 ---------- */
 .card .status.good { color: var(--good); }
 .card-news { font-size: 12px; }
-.news-strip { display: flex; gap: 18px; flex-wrap: wrap; padding: 8px 24px; border-bottom: 1px solid var(--border); font-size: 13px; background: var(--surface); }
 dl.changes { display: grid; grid-template-columns: 140px 1fr; gap: 10px 16px; margin: 0; }
 dl.changes dt { color: var(--muted); font-weight: 600; }
 dl.changes dd { margin: 0; }

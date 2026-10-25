@@ -1,4 +1,4 @@
-# Bank Intelligence Web App — Vision & Game Plan
+# Curinos FI Intelligence Hub (formerly Bank Intelligence) — Vision & Game Plan
 
 Status: draft v1 (23 Oct 2026) · Owner: Peter Clifton
 
@@ -284,3 +284,9 @@ Not yet: live web search (it answers from the app only), and saved conversation 
 - **Refresh news** on every bank page: an immediate Claude API web search for the last 30 days, at about $0.20–0.40 a run.
 - **News history** page per bank. Ask can now search the full news history and each dashboard's version history ("what has changed since last quarter").
 
+
+## Bank page layout (Oct 2026)
+
+- The app is named **Curinos FI Intelligence Hub** in the top bar, page titles and emails. Each dashboard's own "Curinos Sales Intelligence Hub" heading is hidden inside the app (`lib/dashboard.ts` injects the override; the stored shell is unchanged).
+- The dashboard's tab bar stays pinned while its content scrolls. Switching tabs from further down starts the new tab at its top.
+- One compact toolbar sits above the dashboard: back link, research date, results status, then Compare peers, News history, a Refresh menu (news now or full refresh), Follow and Ask. The headline strip is gone; collected news lives in the dashboard's Recent News tab.
