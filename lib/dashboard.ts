@@ -27,8 +27,10 @@ function scriptSafeJson(value: unknown) {
 }
 
 // Inside the app the page already carries the app name, so the dashboard's own
-// heading goes, and the tab bar stays pinned while the content scrolls.
+// heading goes, the font matches the app's (--font in globals.css), and the
+// tab bar stays pinned while the content scrolls.
 const IN_APP_STYLE = `<style>
+body,button,input,select,textarea{font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif}
 .hdr{display:none}
 .tabs{position:sticky;top:0;z-index:100;box-shadow:0 6px 12px -8px rgba(0,0,0,.6)}
 </style>`;
