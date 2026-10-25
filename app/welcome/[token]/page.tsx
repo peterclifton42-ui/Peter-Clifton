@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { findLink } from "@/lib/accounts";
-import { APP_NAME } from "@/lib/brand";
+import { NAME_UNDER_LOGO } from "@/lib/brand";
 import { adminConfigured, createAdminClient } from "@/lib/supabase/admin";
 import { SetPasswordForm } from "./set-password-form";
 
@@ -21,7 +21,7 @@ export default async function WelcomePage({ params }: Props) {
         <div className="panel login-card">
         {/* eslint-disable-next-line @next/next/no-img-element -- a small static SVG */}
         <img className="login-logo" src="/curinos-logo.svg" alt="Curinos" width={117} height={26} />
-          <h1>{APP_NAME}</h1>
+          <h1>{NAME_UNDER_LOGO}</h1>
           <p className="sub">{found.problem}</p>
           <p><Link href="/login/forgot">Get a new link</Link> or ask your admin to resend your invite.</p>
         </div>
@@ -36,7 +36,7 @@ export default async function WelcomePage({ params }: Props) {
       <div className="panel login-card">
         {/* eslint-disable-next-line @next/next/no-img-element -- a small static SVG */}
         <img className="login-logo" src="/curinos-logo.svg" alt="Curinos" width={117} height={26} />
-        <h1>{invite ? `Welcome to ${APP_NAME}` : "Choose a new password"}</h1>
+        <h1>{invite ? `Welcome to ${NAME_UNDER_LOGO}` : "Choose a new password"}</h1>
         <p className="sub">
           {invite ? "Choose a password to finish setting up your account." : "Choose a new password for your account."}
           {data.user?.email && <> You&apos;ll sign in as <b>{data.user.email}</b>.</>}

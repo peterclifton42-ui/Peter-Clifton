@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { APP_NAME } from "@/lib/brand";
+import { APP_NAME, NAME_UNDER_LOGO } from "@/lib/brand";
 import { requireViewer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -19,7 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Link href="/" className="brand" aria-label={`${APP_NAME} home`}>
           {/* eslint-disable-next-line @next/next/no-img-element -- a small static SVG */}
           <img src="/curinos-logo.svg" alt="" width={90} height={20} />
-          <span>{APP_NAME}</span>
+          <span>{NAME_UNDER_LOGO}</span>
         </Link>
         {viewer.role !== "pending" && (
           <nav className="nav">
