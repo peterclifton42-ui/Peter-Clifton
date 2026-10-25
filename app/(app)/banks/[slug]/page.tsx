@@ -71,13 +71,11 @@ export default async function BankPage({ params }: Props) {
           {new Date(snapshot.loaded_at).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
         </span>
         {outOfDate ? (
-          <>
-            <span className="badge medium">{latest.period} results out {formatDay(latest.event_date)} · not yet in this dashboard</span>
-            <RequestRefreshButton slug={slug} requested={request} />
-          </>
+          <span className="badge medium">{latest.period} results out {formatDay(latest.event_date)} · not yet in this dashboard</span>
         ) : next ? (
           <span className="meta">Next results {formatDay(next.event_date)}{next.status === "estimated" ? " (estimated)" : ""}</span>
         ) : null}
+        <RequestRefreshButton slug={slug} requested={request} />
         {(versions ?? 0) > 1 && <Link href={`/banks/${slug}/changes`}>What changed since the last version →</Link>}
         <Link href={`/compare?ids=${[slug, ...suggestPeers(slug, all ?? [])].join(",")}`}>Compare with peers →</Link>
         <AskDrawer context={{ kind: "bank", slug, name: institution.name }} />

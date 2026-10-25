@@ -32,7 +32,12 @@ Never mark something reported without a source.
 
 Add each item:
 
-`python3 pipeline/db.py add-news <slug> <YYYY-MM-DD> "<headline as published>" "<one plain sentence on why it matters to a seller>" "<publisher>" <url>`
+`python3 pipeline/db.py add-news <slug> <YYYY-MM-DD> "<headline as published>" "<one plain sentence on why it matters to a seller>" "<publisher>" <url> --tag <tag> --angle "<sales angle>"`
+
+- `--tag` is one of `earnings` (results, guidance, analyst ratings), `strategy` (M&A, leadership, branches, pricing moves), `digital` (technology, apps, product launches), `partnership` (vendors, fintechs, other banks) or `risk` (regulatory actions, credit or legal issues).
+- `--angle` is one sentence on how a Curinos seller could use the item in a conversation. Stick to the facts in the article; make no product claims. For a credit union, say members, not customers.
+
+These items appear in the dashboard's Recent News tab, so the tag and angle matter.
 
 Never invent a figure, and never add an item without a working source URL.
 

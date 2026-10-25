@@ -15,7 +15,7 @@ bypasses row-level security, so it lives only there and in Vercel.
     python3 pipeline/db.py events-latest             # each institution's latest period
     python3 pipeline/db.py set-event <slug> "<period>" [--date D] [--status S] [--kind K] [--source URL] [--note TEXT]
     python3 pipeline/db.py news-targets [n]          # most-followed institutions (default 15)
-    python3 pipeline/db.py add-news <slug> <YYYY-MM-DD> "<headline>" "<summary>" "<source name>" <url>
+    python3 pipeline/db.py add-news <slug> <YYYY-MM-DD> "<headline>" "<summary>" "<source name>" <url> --tag <earnings|strategy|digital|partnership|risk> --angle "<sales angle>"
 
 Every command prints JSON.
 """
@@ -97,6 +97,8 @@ def main():
     p = sub.add_parser("add-news")
     for name in ("slug", "date", "headline", "summary", "source_name", "url"):
         p.add_argument(name)
+    p.add_argument("--tag", choices=["earnings", "strategy", "digital", "partnership", "risk"], default="strategy")
+    p.add_argument("--angle", help="one sentence on how a seller could use it")
     a = ap.parse_args()
 
     if a.cmd == "check":
@@ -160,7 +162,7 @@ def main():
     elif a.cmd == "add-news":
         row = request("POST", "news_items", {
             "slug": a.slug, "published_on": a.date, "headline": a.headline, "summary": a.summary,
-            "source_name": a.source_name, "url": a.url,
+            "source_name": a.source_name, "url": a.url, "tag": a.tag, "sales_angle": (a.angle or "").strip() or None,
         }, params={"on_conflict": "slug,headline"}, prefer="resolution=ignore-duplicates,return=representation")
         out({"added": bool(row)})
 
