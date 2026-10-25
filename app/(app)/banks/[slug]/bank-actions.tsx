@@ -10,14 +10,14 @@ export function RequestRefreshButton({ slug, requested }: { slug: string; reques
     const day = new Date(requested.at).toLocaleDateString("en-US", { day: "numeric", month: "short" });
     return (
       <span className="meta" title="The refresh job runs at 00:07 and 12:07 UTC and takes requested banks first. You'll get an alert when it's live.">
-        ⟳ Refresh requested{requested.byYou ? " by you" : ""} {day} · next run takes it first
+        ⟳ Full refresh requested{requested.byYou ? " by you" : ""} {day} · next run takes it first
       </span>
     );
   }
   return (
     <button type="button" className="ask-open secondary" disabled={pending} onClick={() => start(() => requestRefresh(slug))}
-      title="Puts this bank first in line for the next scheduled refresh (00:07 or 12:07 UTC).">
-      {pending ? "Requesting…" : "Request refresh"}
+      title="Re-researches the whole dashboard (results, strategy, products, contacts). Puts this bank first in line for the next scheduled refresh at 00:07 or 12:07 UTC; you'll get an alert when it's live.">
+      {pending ? "Requesting…" : "Request full refresh"}
     </button>
   );
 }

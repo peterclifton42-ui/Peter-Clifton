@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireViewer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
-// Ask for an out-of-date dashboard to be refreshed. The scheduled refresh job
+// Ask for a dashboard to be fully re-researched (any bank, current or not). The scheduled refresh job
 // takes requested institutions first; publishing closes the request.
 export async function requestRefresh(slug: string) {
   const viewer = await requireViewer();

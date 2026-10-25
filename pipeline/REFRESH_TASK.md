@@ -24,7 +24,7 @@ Repository: `/home/user/Peter-Clifton` (if it is missing, `git clone https://git
 python3 pipeline/db.py queue
 ```
 
-The queue lists institutions whose latest published results are newer than their dashboard, requested by a seller first (the "Request refresh" button), then most-followed, then oldest results first. It leaves out anything another run claimed in the last 6 hours. Take the **first** entry.
+The queue lists institutions whose latest published results are newer than their dashboard, plus any institution a seller asked to refresh (the "Request full refresh" button, which works on any bank). Requested ones come first, then most-followed, then oldest results first. A requested bank may already have its latest results in the dashboard: research it fully anyway, using the latest reported quarter (`period` may be empty if no results are recorded; then use the latest quarter you can source). It leaves out anything another run claimed in the last 6 hours. Take the **first** entry.
 
 - **Empty list:** run `python3 pipeline/db.py start refresh "Queue empty"`, then `python3 pipeline/db.py finish <run id> skipped "Queue empty: every dashboard is current"`, and stop. That is a correct outcome.
 - **Otherwise, claim it:** `python3 pipeline/db.py start refresh <slug> "Researching <period> results"`. Keep the printed `run_id` as the RUN ID.
