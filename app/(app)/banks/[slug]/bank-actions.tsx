@@ -32,7 +32,12 @@ export function RefreshNewsButton({ slug }: { slug: string }) {
       const res = await fetch(`/api/news/${slug}`, { method: "POST" });
       const body = await res.json().catch(() => ({ error: "Something went wrong." }));
       if (!res.ok) return setState({ busy: false, message: body.error, error: true });
-      setState({ busy: false, message: body.added ? `Added ${body.added} new item${body.added === 1 ? "" : "s"}.` : "No new news found." });
+      setState({
+        busy: false,
+        message: body.added
+          ? `Added ${body.added} new item${body.added === 1 ? "" : "s"}.`
+          : body.found ? `Found ${body.found}, but none were new or recent enough.` : "No new news found in the last 30 days.",
+      });
       router.refresh();
     } catch {
       setState({ busy: false, message: "The connection dropped. Try again.", error: true });

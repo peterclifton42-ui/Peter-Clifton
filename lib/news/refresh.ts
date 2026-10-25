@@ -41,13 +41,16 @@ const SAVE_NEWS: Anthropic.Beta.BetaTool = {
 
 type Item = { published_on: string; headline: string; summary: string; source_name: string; url: string };
 
-function valid(i: unknown, since: string, today: string): i is Item {
-  const x = i as Partial<Item>;
-  return typeof x?.headline === "string" && x.headline.trim().length > 5
-    && typeof x.url === "string" && /^https:\/\/[^\s]+$/.test(x.url)
-    && typeof x.published_on === "string" && /^\d{4}-\d{2}-\d{2}$/.test(x.published_on)
-    && x.published_on >= since && x.published_on <= today
-    && typeof x.summary === "string" && typeof x.source_name === "string";
+// Why an item can't be saved, or null if it can. Dates may come back with a time
+// part; only the day matters.
+function rejection(i: Partial<Item>, since: string, today: string): string | null {
+  if (typeof i?.headline !== "string" || i.headline.trim().length < 6) return "no headline";
+  if (typeof i.url !== "string" || !/^https?:\/\/\S+$/.test(i.url)) return "no usable URL";
+  const day = typeof i.published_on === "string" ? i.published_on.slice(0, 10) : "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return `unreadable date "${i.published_on}"`;
+  if (day > today) return `date ${day} is in the future`;
+  if (day < since) return `older than the window (${day})`;
+  return null;
 }
 
 export async function refreshNews(opts: {
@@ -66,20 +69,22 @@ export async function refreshNews(opts: {
     role: "user",
     content: `Today is ${today}. Find news about ${name}${opts.isCreditUnion ? " (a US credit union)" : " (a US bank holding company)"} published between ${since} and ${today}.
 
-Keep at most 6 items a Curinos seller (deposit pricing, analytics and advisory for banks) would care about: results and guidance, M&A, leadership changes, product or digital launches, branch openings or closures, deposit or pricing moves, regulatory actions, analyst rating changes. Skip share-price noise, listicles, and anything not clearly about ${name}.${opts.isCreditUnion ? " Credit unions have members, not customers." : ""}
+Search well: try the name with "news", with its ticker, with "announces", and with the current month; company press releases and investor-relations announcements count. Keep at most 6 items a Curinos seller (deposit pricing, analytics and advisory for banks) would care about: results and guidance, M&A, leadership changes, product or digital launches, branch openings or closures, deposit or pricing moves, regulatory actions, analyst rating changes. Skip share-price noise, listicles, and anything not clearly about ${name}.${opts.isCreditUnion ? " Credit unions have members, not customers." : ""}
 Only use articles you actually found, with their real URLs and dates. Never invent a headline, date or figure. Already recorded (skip these): ${(known ?? []).slice(0, 40).map((k) => k.headline).join(" | ") || "none"}.
 When done, call save_news once with the items.`,
   }];
 
   let usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, searches: 0 };
   let items: Item[] = [];
+  let raw: unknown[] = [];
+  const rejected: { headline: unknown; reason: string }[] = [];
   try {
     for (let turn = 0; turn < 6; turn++) {
       const res = await client.beta.messages.create({
         model: MODEL,
         max_tokens: 16000,
-        output_config: { effort: "low" },
-        tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 5 }, SAVE_NEWS],
+        output_config: { effort: "medium" },
+        tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 8 }, SAVE_NEWS],
         messages,
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
@@ -99,8 +104,14 @@ When done, call save_news once with the items.`,
       }
       const save = res.content.find((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use" && b.name === "save_news");
       if (save && res.stop_reason !== "max_tokens") {
-        const raw = (save.input as { items?: unknown[] }).items ?? [];
-        items = raw.filter((i): i is Item => valid(i, since, today)).filter((i) => !knownUrls.has(i.url)).slice(0, 6);
+        raw = (save.input as { items?: unknown[] }).items ?? [];
+        for (const r of raw) {
+          const i = r as Partial<Item>;
+          const why = rejection(i, since, today) ?? (knownUrls.has(i.url!) ? "already saved" : null);
+          if (why) rejected.push({ headline: i?.headline, reason: why });
+          else items.push({ ...(i as Item), published_on: i.published_on!.slice(0, 10) });
+        }
+        items = items.slice(0, 6);
         break;
       }
       if (res.stop_reason !== "tool_use") {
@@ -119,10 +130,10 @@ When done, call save_news once with the items.`,
     }
     const cost = cost$(usage);
     await admin.from("news_refreshes").update({
-      status: "done", finished_at: new Date().toISOString(), items_found: items.length, items_added: added,
-      searches: usage.searches, cost_usd: cost,
+      status: "done", finished_at: new Date().toISOString(), items_found: raw.length, items_added: added,
+      searches: usage.searches, cost_usd: cost, raw_items: raw, rejected,
     }).eq("id", run?.id);
-    return { ok: true as const, added, found: items.length, searches: usage.searches };
+    return { ok: true as const, added, found: raw.length, rejected: rejected.length, searches: usage.searches };
   } catch (e) {
     const message = e instanceof Anthropic.APIError ? `Claude API error ${e.status ?? ""}: ${(e.error as { error?: { message?: string } } | undefined)?.error?.message ?? e.message}` : e instanceof Error ? e.message : String(e);
     await admin.from("news_refreshes").update({
