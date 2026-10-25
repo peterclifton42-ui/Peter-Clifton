@@ -3,14 +3,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireViewer } from "@/lib/auth";
 import { renderDashboard } from "@/lib/dashboard";
-import { addDays, EVENT_COLUMNS, formatDay, latestAndNext, needsRefresh, todayISO, type EarningsEvent } from "@/lib/earnings";
+import { EVENT_COLUMNS, formatDay, latestAndNext, needsRefresh, todayISO, type EarningsEvent } from "@/lib/earnings";
 import { followedSlugs } from "@/lib/follows";
 import { categoryLabel, formatAssets, shortQuarter, INSTITUTION_COLUMNS, type Institution } from "@/lib/institutions";
 import { createClient } from "@/lib/supabase/server";
 import { suggestPeers } from "@/lib/metrics";
 import { withCollectedNews } from "@/lib/news/merge";
 import { AskDrawer } from "../../ask/ask-chat";
-import { RefreshNewsButton, RequestRefreshButton } from "./bank-actions";
+import { RefreshMenu } from "./bank-actions";
 import { FollowButton } from "../../follow-button";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -39,13 +39,11 @@ export default async function BankPage({ params }: Props) {
   const viewer = await requireViewer();
   const supabase = await createClient();
   const today = todayISO();
-  const [{ data: snapshot }, { data: events }, followed, { count: versions }, { data: news }, { data: all }, { count: newsTotal }, { data: requests }, { data: collected }] = await Promise.all([
+  const [{ data: snapshot }, { data: events }, followed, { count: versions }, { data: all }, { count: newsTotal }, { data: requests }, { data: collected }] = await Promise.all([
     supabase.from("snapshots").select("data, loaded_at").eq("id", institution.current_snapshot_id).single(),
     supabase.from("earnings_events").select(EVENT_COLUMNS).eq("slug", slug),
     followedSlugs(viewer.id),
     supabase.from("snapshots").select("id", { count: "exact", head: true }).eq("slug", slug),
-    supabase.from("news_items").select("published_on, headline, source_name, url").eq("slug", slug)
-      .gte("published_on", addDays(today, -30)).order("published_on", { ascending: false }).limit(3),
     supabase.from("institutions").select("slug, category, assets_b"),
     supabase.from("news_items").select("id", { count: "exact", head: true }).eq("slug", slug),
     supabase.from("refresh_requests").select("requested_by, requested_at").eq("slug", slug).is("fulfilled_at", null)
@@ -61,35 +59,29 @@ export default async function BankPage({ params }: Props) {
   const html = await renderDashboard(withCollectedNews(snapshot.data, collected ?? [], snapshot.loaded_at));
 
   return (
-    <>
+    <div className="bank-page">
       <div className="bank-bar">
-        <Link href="/banks">← All banks</Link>
-        <FollowButton slug={slug} name={institution.name} following={followed.has(slug)} />
+        <Link href="/banks" className="back">← Banks</Link>
         <span className="meta">
-          {categoryLabel(institution.category)} · {formatAssets(institution.assets_b)} assets · data to{" "}
+          {categoryLabel(institution.category)} · {formatAssets(institution.assets_b)} · data to{" "}
           {shortQuarter(institution.latest_quarter)} · researched{" "}
           {new Date(snapshot.loaded_at).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
         </span>
         {outOfDate ? (
-          <span className="badge medium">{latest.period} results out {formatDay(latest.event_date)} · not yet in this dashboard</span>
-        ) : next ? (
-          <span className="meta">Next results {formatDay(next.event_date)}{next.status === "estimated" ? " (estimated)" : ""}</span>
-        ) : null}
-        <RequestRefreshButton slug={slug} requested={request} />
-        {(versions ?? 0) > 1 && <Link href={`/banks/${slug}/changes`}>What changed since the last version →</Link>}
-        <Link href={`/compare?ids=${[slug, ...suggestPeers(slug, all ?? [])].join(",")}`}>Compare with peers →</Link>
-        <AskDrawer context={{ kind: "bank", slug, name: institution.name }} />
-      </div>
-      <div className="news-strip">
-        <span className="dim">{news && news.length > 0 ? "Latest news" : "No news in the last 30 days"}</span>
-        {(news ?? []).map((n) => (
-          <span key={n.headline}>
-            <span className="dim">{formatDay(n.published_on)}</span>{" "}
-            {n.url ? <a href={n.url} target="_blank" rel="noreferrer">{n.headline}</a> : n.headline}
+          <span className="badge medium" title="The latest results are out but this dashboard was researched before them.">
+            {latest.period} results out {formatDay(latest.event_date)} · not in dashboard yet
           </span>
-        ))}
-        <RefreshNewsButton slug={slug} />
-        {(newsTotal ?? 0) > 0 && <Link href={`/banks/${slug}/news`}>All news ({newsTotal}) →</Link>}
+        ) : next ? (
+          <span className="meta">Next results {formatDay(next.event_date)}{next.status === "estimated" ? " (est.)" : ""}</span>
+        ) : null}
+        <span className="bank-tools">
+          {(versions ?? 0) > 1 && <Link href={`/banks/${slug}/changes`}>What changed</Link>}
+          <Link href={`/compare?ids=${[slug, ...suggestPeers(slug, all ?? [])].join(",")}`}>Compare peers</Link>
+          {(newsTotal ?? 0) > 0 && <Link href={`/banks/${slug}/news`}>News history ({newsTotal})</Link>}
+          <RefreshMenu slug={slug} requested={request} />
+          <FollowButton slug={slug} name={institution.name} following={followed.has(slug)} />
+          <AskDrawer context={{ kind: "bank", slug, name: institution.name }} />
+        </span>
       </div>
       {/* The dashboard runs in a sandbox with no access to this page or the login session. */}
       <iframe
@@ -98,6 +90,6 @@ export default async function BankPage({ params }: Props) {
         srcDoc={html}
         sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
       />
-    </>
+    </div>
   );
 }

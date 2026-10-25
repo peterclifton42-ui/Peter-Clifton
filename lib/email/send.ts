@@ -1,10 +1,11 @@
 import "server-only";
+import { APP_NAME } from "../brand";
 
 // Sends email through Resend (resend.com). Needs RESEND_API_KEY in Vercel; until
 // a domain is verified there, EMAIL_FROM stays on Resend's test sender, which can
 // only deliver to the Resend account's own address.
 export const APP_URL = (process.env.APP_URL || "https://peter-clifton.vercel.app").replace(/\/$/, "");
-const FROM = process.env.EMAIL_FROM || "Bank Intelligence <onboarding@resend.dev>";
+const FROM = process.env.EMAIL_FROM || `${APP_NAME} <onboarding@resend.dev>`;
 
 export type Email = { to: string; subject: string; html: string; text: string };
 export type SendResult = { ok: true } | { ok: false; error: string };

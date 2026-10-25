@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDays, formatDay, kindLabel, needsRefresh, todayISO, type EarningsEvent } from "../earnings";
 import { pause, sendEmail, type Email } from "./send";
 import { renderEmail, type Item, type Section } from "./templates";
+import { APP_NAME } from "../brand";
 
 type Person = { id: string; email: string; full_name: string | null };
 type Prefs = { instant: boolean; digest: boolean };
@@ -199,10 +200,10 @@ export async function sendPreview(db: SupabaseClient, userId: string, kind: "tes
     if (!email) return { ok: false as const, error: "Nothing to put in a digest this week." };
   } else {
     email = {
-      to: person.email, subject: "Bank Intelligence test email",
+      to: person.email, subject: `${APP_NAME} test email`,
       ...renderEmail({
         preheader: "Email is working.", heading: "Email is working",
-        intro: "This test came from the Bank Intelligence app. Alerts and the weekly digest will arrive looking like this.",
+        intro: `This test came from the ${APP_NAME} app. Alerts and the weekly digest will arrive looking like this.`,
         sections: [],
       }),
     };
