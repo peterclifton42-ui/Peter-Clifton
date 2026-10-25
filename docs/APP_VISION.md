@@ -264,3 +264,18 @@ Built:
 
 How: no AI model at request time. Themes and objection types are keyword rules over the dashboards' own text, and every count shows its evidence so a seller can judge it. Phase 7's assistant can later add summaries on top. Still open from decision 10: a curated list of threat themes signed off by the sales team, and a definition of the HIGH/MEDIUM/LOW opportunity rating (decision 12).
 
+### Phase 7 status (25 Oct 2026)
+Built:
+- **Ask** (`/ask` in the menu, and an "Ask about this bank / product" side panel on every bank and product page). The chat assistant runs on Claude Opus 5.5 through the Claude API, using Peter's account. It looks things up with eight read-only tools:
+  - find institutions (including "my banks");
+  - read any dashboard section, among them strategy, data maturity, technology platforms, contacts (in, by decision), the sales playbook and the dashboard's own news;
+  - scan one section across every dashboard;
+  - news, the earnings calendar and FDIC/NCUA call report figures;
+  - the cross-bank insights and a product's catalogue entry and target list.
+- **Answers** link to their sources (bank pages, products, Compare, news URLs) and say how current a fact is. The assistant says when the app doesn't hold something, and follows the catalogue's product rules (roadmap, unlisted, UK-only, credit-union language).
+- **Controls:** each person can ask 40 questions per rolling 24 hours (`ASK_DAILY_LIMIT`). There's a 👍/👎 on every answer with an optional note (decision 15). Admin shows the month's questions, estimated cost and the answers marked 👎. Every question is logged in `ask_log`.
+
+Cost: Opus 5.5 at $4 / $20 per million tokens. A typical question makes two or three lookups and costs about $0.05–0.15, around $0.10. 20 sellers asking three questions a working day would be about $125 a month; one a day, about $40. Cheaper option if needed: switch `MODEL` in `lib/ask/agent.ts` to Claude Sonnet 5.5 at half the price.
+
+Not yet: live web search (it answers from the app only), and saved conversation history (each tab keeps its own conversation until closed).
+
