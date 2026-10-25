@@ -49,6 +49,8 @@ The instructions in `lib/ask/agent.ts` require linked sources and enforce the ca
 - Supabase's scheduler (pg_cron) calls `/api/email/alerts` every 30 minutes and `/api/email/digest` on Mondays at 11:23 UTC, with a secret only the database holds. Dashboard and results alerts are emailed straight away (one email per person per run); news waits for the weekly digest.
 - Each person turns instant alerts and the digest on or off on their account page. Every send is listed under Admin → Email.
 
+**After adding or changing a key in Vercel, redeploy.** Vercel only gives keys to versions built after they were added. Use Deployments → the top Production deployment → ⋯ → Redeploy, or merge any change. Until then the app keeps saying the feature isn't switched on.
+
 ## Adding a seller
 
 Sign in as an admin, open **Admin**, enter their name and email and click **Create login**. Send them the temporary password it shows; they can change it under their name (top right).
