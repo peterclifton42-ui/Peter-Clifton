@@ -24,8 +24,10 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
   if (!inst) return NextResponse.json({ error: "Unknown institution." }, { status: 404 });
 
   const since = new Date(Date.now() - NEWS_COOLDOWN_HOURS * 3600 * 1000).toISOString();
+  // Only a run that is still going, or one that added news, blocks another.
   const { data: recent } = await db.from("news_refreshes").select("started_at, status")
-    .eq("slug", slug).neq("status", "failed").gte("started_at", since).order("started_at", { ascending: false }).limit(1);
+    .eq("slug", slug).gte("started_at", since).or("status.eq.running,items_added.gt.0")
+    .order("started_at", { ascending: false }).limit(1);
   if (recent?.length) {
     const when = new Date(recent[0].started_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
     return NextResponse.json({ error: recent[0].status === "running" ? "A news refresh for this bank is already running." : `News was refreshed at ${when} ET. Try again in a few hours.` }, { status: 429 });

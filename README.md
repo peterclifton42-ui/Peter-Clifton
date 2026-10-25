@@ -36,7 +36,7 @@ Roles: **pending** (signed up but no access), **seller** (can see everything), *
 ## Refresh buttons and news history
 
 - **Request refresh** appears on a bank page when its results are out but the dashboard is older. It records a `refresh_requests` row. The scheduled refresh job (on the Claude plan, 00:07 and 12:07 UTC) takes requested institutions first. Publishing closes the request and alerts whoever asked.
-- **Refresh news** on any bank page runs a web search through the Claude API (`lib/news/refresh.ts`): at most 5 searches and 6 items, roughly $0.20–0.40, logged in `news_refreshes`. It's limited to once every 3 hours per bank and 15 times a day per person. New items alert followers like any other news.
+- **Refresh news** on any bank page runs a web search through the Claude API (`lib/news/refresh.ts`): at most 5 searches and 6 items, roughly $0.25–0.45, logged in `news_refreshes` with what it found and why any item was rejected. It's limited to once every 3 hours per bank after a run that added news and 15 times a day per person. New items alert followers like any other news.
 - News is never deleted. `/banks/<slug>/news` lists the whole history. The Ask assistant searches it (`get_news` with a keyword, or the full history for one bank) and reads each dashboard's version history (`get_dashboard_history`) to describe change over time.
 
 ## Ask
