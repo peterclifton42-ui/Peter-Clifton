@@ -28,8 +28,10 @@ const SAVE_NEWS: Anthropic.Beta.BetaTool = {
             summary: { type: "string", description: "One plain sentence on why it matters to a Curinos seller" },
             source_name: { type: "string", description: "Publisher" },
             url: { type: "string", description: "The article URL exactly as found" },
+            tag: { type: "string", enum: ["earnings", "strategy", "digital", "partnership", "risk"], description: "What kind of news it is" },
+            sales_angle: { type: "string", description: "One sentence on how a Curinos seller could use it in a conversation (no product claims beyond the facts)" },
           },
-          required: ["published_on", "headline", "summary", "source_name", "url"],
+          required: ["published_on", "headline", "summary", "source_name", "url", "tag", "sales_angle"],
           additionalProperties: false,
         },
       },
@@ -39,7 +41,8 @@ const SAVE_NEWS: Anthropic.Beta.BetaTool = {
   },
 };
 
-type Item = { published_on: string; headline: string; summary: string; source_name: string; url: string };
+type Item = { published_on: string; headline: string; summary: string; source_name: string; url: string; tag: string; sales_angle: string };
+const TAGS = ["earnings", "strategy", "digital", "partnership", "risk"];
 
 // Why an item can't be saved, or null if it can. Dates may come back with a time
 // part; only the day matters.
@@ -125,6 +128,7 @@ When done, call save_news once with the items.`,
       const { data } = await admin.from("news_items").upsert({
         slug, published_on: i.published_on, headline: i.headline.trim(), summary: i.summary.trim(),
         source_name: i.source_name.trim(), url: i.url,
+        tag: TAGS.includes(i.tag) ? i.tag : "strategy", sales_angle: i.sales_angle?.trim() || null,
       }, { onConflict: "slug,headline", ignoreDuplicates: true }).select("id");
       added += data?.length ?? 0;
     }
