@@ -48,7 +48,7 @@ Roles: **pending** (signed up but no access), **seller** (can see everything), *
 - news, the earnings calendar and call report figures;
 - market insights and the product catalogue.
 
-The instructions in `lib/ask/agent.ts` require linked sources and enforce the catalogue's product rules. Every question is logged in `ask_log` (tokens, estimated cost, 👍/👎 with comments), and Admin → Ask assistant shows the month's usage and the answers marked 👎.
+The instructions in `lib/ask/agent.ts` require linked sources and enforce the catalogue's product rules. Every question is logged in `ask_log` (tokens, estimated cost, 👍/👎 with comments), and Admin → Ask assistant shows the month's usage and the answers marked 👎. **Admin → Questions** (`/admin/questions`) lists every question and answer with filters (person, bank, rating, period, search) and a CSV download, plus the banks, topics and products sellers ask about most and the answers that fell short (errors, 👎, or data gaps where the answer says the app doesn't hold something). The Ask box tells sellers their questions are saved.
 
 ## Alerts and email
 
