@@ -70,3 +70,13 @@ npm run dev        # http://localhost:3000
 npm run typecheck
 npm run build
 ```
+
+## Whitespace (part 1)
+
+Sellers record, for each bank and Curinos product, what the account team knows: **Validated whitespace** (with the quarter to pursue and ACV), **In play** (ACV, expected close), **Recently lost: pipeline** (lost within 12 months), **Recently lost: renewal** (within 24 months), **Current client** or **Not a fit**. No status means not reviewed. Statuses are shared by everyone on the account (table `whitespace`, one row per bank x product); every change is logged by trigger in `whitespace_events` for history. Lost deals turn back into whitespace when their window passes.
+
+- **Bank page → Whitespace** (switch next to Dashboard): every product grouped by pillar, with the research's priority and fit beside the team's status, and recent changes.
+- **Whitespace** (top menu): the seller's book (followed banks) as headline numbers and a bank x product grid, editable cell by cell.
+- Products that don't apply (wrong country, banks-only for a credit union, hard size gates) are greyed out, from the catalogue's own rules (`lib/whitespace.ts`).
+- Demo rows are flagged `is_demo`; Admin → Whitespace → **Clear demo data** removes them and their history.
+
