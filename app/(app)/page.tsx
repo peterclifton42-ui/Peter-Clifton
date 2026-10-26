@@ -7,6 +7,7 @@ import {
 import { followedSlugs } from "@/lib/follows";
 import { categoryLabel, formatAssets, INSTITUTION_COLUMNS, shortQuarter, type Institution } from "@/lib/institutions";
 import { createClient } from "@/lib/supabase/server";
+import { WHITESPACE_COLUMNS, bookOf, formatQuarter, formatUsd, quarterOf, type WhitespaceRow } from "@/lib/whitespace";
 import { FollowButton } from "./follow-button";
 
 export const metadata: Metadata = { title: "Home" };
@@ -36,6 +37,14 @@ export default async function HomePage() {
   for (const n of (newsRows ?? []) as (News & { slug: string })[]) if (!latestNews.has(n.slug)) latestNews.set(n.slug, n);
 
   const mine = all.filter((i) => followed.has(i.slug));
+  const mineSlugs = mine.map((i) => i.slug);
+  const [{ data: research }, { data: wsRows }] = mineSlugs.length
+    ? await Promise.all([
+      supabase.from("insight_inputs").select("slug, products, dnr_products").in("slug", mineSlugs),
+      supabase.from("whitespace").select(WHITESPACE_COLUMNS).in("slug", mineSlugs),
+    ])
+    : [{ data: [] }, { data: [] }];
+  const book = bookOf({ institutions: mine, research: (research ?? []) as never, rows: (wsRows ?? []) as WhitespaceRow[] });
   const suggestions = all.filter((i) => i.opportunity === "HIGH").slice(0, 6);
   const upcoming = evs.filter((e) => e.event_date >= today && e.event_date <= addDays(today, 14) && e.status !== "reported");
   const stale = evs
@@ -51,6 +60,26 @@ export default async function HomePage() {
           <p>{formatDay(today)} · what&apos;s happening at the banks you follow, and across the market.</p>
         </div>
       </div>
+
+      {mine.length > 0 && (
+        <section className="panel">
+          <div className="panel-head">
+            <h2>Your whitespace</h2>
+            <Link href="/whitespace">Open your book →</Link>
+          </div>
+          <div className="stat-row compact">
+            <div className="stat"><b>{formatUsd(book.totals.validated.acv) || "$0"}</b><span>validated · {book.totals.validated.count}</span></div>
+            <div className="stat"><b>{formatUsd(book.totals.inPlay.acv) || "$0"}</b><span>in play · {book.totals.inPlay.count}</span></div>
+            <div className="stat"><b>{book.totals.dueThisQuarter}</b><span>due by {formatQuarter(quarterOf(new Date()))}</span></div>
+            <div className="stat"><b>{book.applicable ? Math.round((book.reviewed / book.applicable) * 100) : 0}%</b><span>products reviewed</span></div>
+          </div>
+          {book.steps.length > 0 && (
+            <ul className="next-steps">
+              {book.steps.slice(0, 3).map((st, i) => <li key={i} className={st.tone}><Link href={st.href}>{st.text} →</Link></li>)}
+            </ul>
+          )}
+        </section>
+      )}
 
       <section className="panel">
         <h2>Your banks ({mine.length})</h2>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PILLAR_ORDER } from "@/lib/products";
+import { memberNames } from "@/lib/people";
 import { createClient } from "@/lib/supabase/server";
 import {
   EVENT_COLUMNS, WHITESPACE_COLUMNS, describeChange, formatQuarter, formatUsd, productLines, totals,
@@ -29,15 +30,15 @@ export default async function BankWhitespacePage({ params, searchParams }: Props
   if (!institution?.current_snapshot_id) notFound();
 
   const supabase = await createClient();
-  const [{ data: snapshot }, { data: research }, { data: rows }, { data: events }, { data: people }] = await Promise.all([
+  const [{ data: snapshot }, { data: research }, { data: rows }, { data: events }, people] = await Promise.all([
     supabase.from("snapshots").select("loaded_at").eq("id", institution.current_snapshot_id).single(),
     supabase.from("insight_inputs").select("products, dnr_products").eq("slug", slug).maybeSingle(),
     supabase.from("whitespace").select(WHITESPACE_COLUMNS).eq("slug", slug),
     supabase.from("whitespace_events").select(EVENT_COLUMNS).eq("slug", slug).order("at", { ascending: false }).limit(12),
-    supabase.from("profiles").select("id, full_name, email"),
+    memberNames(),
   ]);
   if (!snapshot) notFound();
-  const nameOf = new Map((people ?? []).map((p) => [p.id as string, (p.full_name || p.email) as string]));
+  const nameOf = people;
   const wsRows = (rows ?? []) as WhitespaceRow[];
   const lines = productLines(institution, research?.products ?? null, research?.dnr_products ?? null, wsRows);
   const applicable = lines.filter((l) => l.applies.ok);

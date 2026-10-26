@@ -2,52 +2,67 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireViewer } from "@/lib/auth";
 import { followedSlugs } from "@/lib/follows";
-import { PILLAR_ORDER, PRODUCTS } from "@/lib/products";
+import { PILLAR_ORDER, PRODUCTS, productBySlug } from "@/lib/products";
+import { memberNames } from "@/lib/people";
 import { createClient } from "@/lib/supabase/server";
 import {
-  STATUSES, STATUS_KEYS, WHITESPACE_COLUMNS, formatQuarter, formatUsd, productLines, quarterOf, totals,
-  type Institution, type ProductLine, type WhitespaceRow,
+  EVENT_COLUMNS, STATUSES, STATUS_KEYS, WHITESPACE_COLUMNS, bookOf, describeChange, formatQuarter, formatUsd, quarterOf, totals, weeklyTrend,
+  type Institution, type ProductLine, type WhitespaceEvent, type WhitespaceRow,
 } from "@/lib/whitespace";
+import { Legend, QuarterColumns, RowBars, TrendLines } from "./charts";
 import { EditTrigger, StatusPill, type EditorTarget } from "./editor";
 
 export const metadata: Metadata = { title: "Whitespace" };
 
 // Short column labels for the grid; the full name is in the tooltip.
 function shortName(name: string) {
-  return name.replace(/^Advisory: /, "").replace(/^Curinos One /, "C1 ").replace(" & ", " & ").replace(/ for Small.*$/, " (small)");
+  return name.replace(/^Advisory: /, "").replace(/^Curinos One /, "C1 ").replace(/ for Small.*$/, " (small)");
 }
+const shortBank = (name: string) => name.replace(/,? (Inc\.|Corporation|Corp\.)$/, "");
+const day = (iso: string) => new Date(iso).toLocaleDateString("en-US", { day: "numeric", month: "short" });
 
-// The seller's book of business (the banks they follow): headline numbers and
-// a grid of every bank x product, editable in place.
+// The seller's book of business (the banks they follow): headline numbers,
+// charts, next steps, recent changes and a bank x product grid editable in place.
 export default async function WhitespacePage({ searchParams }: { searchParams: Promise<{ pillar?: string }> }) {
   const viewer = await requireViewer();
-  const pillar = PILLAR_ORDER.includes((await searchParams).pillar ?? "") ? (await searchParams).pillar! : null;
+  const requested = (await searchParams).pillar ?? "";
+  const pillar = PILLAR_ORDER.includes(requested) ? requested : null;
   const followed = [...await followedSlugs(viewer.id)];
   const supabase = await createClient();
-  const [{ data: insts }, { data: research }, { data: rows }] = followed.length
+  const since = new Date(Date.now() - 30 * 86400 * 1000).toISOString();
+  const [{ data: insts }, { data: research }, { data: rows }, { data: snaps }, { data: events }, people] = followed.length
     ? await Promise.all([
       supabase.from("institutions").select("slug, name, category, assets_b").in("slug", followed),
       supabase.from("insight_inputs").select("slug, products, dnr_products").in("slug", followed),
       supabase.from("whitespace").select(WHITESPACE_COLUMNS).in("slug", followed),
+      supabase.from("whitespace_snapshots").select("week, status, acv_usd").in("slug", followed).in("status", ["validated", "in_play"]),
+      supabase.from("whitespace_events").select(EVENT_COLUMNS).in("slug", followed).gte("at", since).order("at", { ascending: false }).limit(200),
+      memberNames(),
     ])
-    : [{ data: [] }, { data: [] }, { data: [] }];
+    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }, new Map<string, string>()];
 
-  const book = ((insts ?? []) as Institution[]).sort((a, b) => Number(b.assets_b ?? 0) - Number(a.assets_b ?? 0));
   const wsRows = (rows ?? []) as WhitespaceRow[];
-  const researchBy = new Map((research ?? []).map((r) => [r.slug as string, r]));
-  const linesBy = new Map(book.map((i) => [i.slug, productLines(
-    i, researchBy.get(i.slug)?.products ?? null, researchBy.get(i.slug)?.dnr_products ?? null, wsRows.filter((r) => r.slug === i.slug),
-  )]));
+  const book = bookOf({ institutions: (insts ?? []) as Institution[], research: (research ?? []) as never, rows: wsRows });
+  const linesBy = book.lines;
+  const t = book.totals;
+  const pct = book.applicable ? Math.round((book.reviewed / book.applicable) * 100) : 0;
+  const demo = wsRows.some((r) => r.is_demo);
+  const weeks = weeklyTrend((snaps ?? []) as { week: string; status: string; acv_usd: number | null }[]);
+  const monthAgo = weeks.length > 4 ? weeks[weeks.length - 5] : weeks[0];
+  const delta = monthAgo ? t.validated.acv + t.inPlay.acv - (monthAgo.validated + monthAgo.inPlay) : 0;
+  const nameOf = people;
+  const bankName = new Map(book.banks.map((i) => [i.slug, shortBank(i.name)]));
+  const recent = ((events ?? []) as WhitespaceEvent[]);
+  const moved = {
+    validated: recent.filter((e) => e.new_status === "validated" && e.old_status !== "validated").length,
+    inPlay: recent.filter((e) => e.new_status === "in_play" && e.old_status !== "in_play").length,
+    lost: recent.filter((e) => (e.new_status === "lost_pipeline" || e.new_status === "lost_renewal") && e.old_status !== e.new_status).length,
+  };
+
   const columns = PRODUCTS
-    .filter((p) => (!pillar || p.pillar === pillar) && book.some((i) => linesBy.get(i.slug)!.find((l) => l.product.slug === p.slug)!.applies.ok))
+    .filter((p) => (!pillar || p.pillar === pillar) && book.banks.some((i) => linesBy.get(i.slug)!.find((l) => l.product.slug === p.slug)!.applies.ok))
     .sort((a, b) => PILLAR_ORDER.indexOf(a.pillar) - PILLAR_ORDER.indexOf(b.pillar) || a.name.localeCompare(b.name));
   const groups = PILLAR_ORDER.map((p) => ({ pillar: p, count: columns.filter((c) => c.pillar === p).length })).filter((g) => g.count);
-
-  const t = totals(wsRows);
-  const applicableCells = book.flatMap((i) => linesBy.get(i.slug)!.filter((l) => l.applies.ok));
-  const reviewed = applicableCells.filter((l) => l.row && !l.expired).length;
-  const pct = applicableCells.length ? Math.round((reviewed / applicableCells.length) * 100) : 0;
-  const demo = wsRows.some((r) => r.is_demo);
 
   const target = (i: Institution, l: ProductLine): EditorTarget => ({
     slug: i.slug, bankName: i.name, productSlug: l.product.slug, productName: l.product.name,
@@ -58,8 +73,7 @@ export default async function WhitespacePage({ searchParams }: { searchParams: P
   });
   const cellTitle = (i: Institution, l: ProductLine) => {
     const bits = [`${i.name} · ${l.product.name}`];
-    if (l.row) bits.push(l.expired ? "Eligible again" : STATUSES[l.row.status].label);
-    else bits.push("Not reviewed");
+    bits.push(l.row ? (l.expired ? "Eligible again" : STATUSES[l.row.status].label) : "Not reviewed");
     if (l.row?.target_quarter) bits.push(formatQuarter(l.row.target_quarter));
     if (l.row?.acv_usd != null) bits.push(formatUsd(l.row.acv_usd));
     if (!l.row && l.priority) bits.push(`research P${l.priority}`);
@@ -70,12 +84,13 @@ export default async function WhitespacePage({ searchParams }: { searchParams: P
     <main className="page page-wide">
       <div className="page-head">
         <div>
-          <h1>Whitespace {demo && <span className="badge status-estimated">Demo data</span>}</h1>
-          <p>Your book of business: the {book.length} {book.length === 1 ? "bank" : "banks"} you follow. Click any cell to set its status.</p>
+          <h1>Whitespace {demo && <span className="badge status-estimated">Includes demo data</span>}</h1>
+          <p>Your book of business: the {book.banks.length} {book.banks.length === 1 ? "bank" : "banks"} you follow. Statuses are shared with everyone on each account.</p>
         </div>
+        {book.banks.length > 0 && <a href="#grid">Jump to the grid ↓</a>}
       </div>
 
-      {book.length === 0 ? (
+      {book.banks.length === 0 ? (
         <div className="panel">
           <p>Your book is built from the banks you follow. <Link href="/banks">Follow a few banks</Link> (☆) and they&apos;ll appear here, ready to review.</p>
         </div>
@@ -85,14 +100,95 @@ export default async function WhitespacePage({ searchParams }: { searchParams: P
             <div className="stat"><b>{formatUsd(t.validated.acv) || "$0"}</b><span>validated whitespace · {t.validated.count} pursuits</span></div>
             <div className="stat"><b>{formatUsd(t.inPlay.acv) || "$0"}</b><span>in play · {t.inPlay.count} in pipeline</span></div>
             <div className="stat"><b>{t.dueThisQuarter}</b><span>pursuits due by {formatQuarter(quarterOf(new Date()))}</span></div>
-            <div className="stat"><b>{pct}%</b><span>reviewed · {reviewed} of {applicableCells.length} applicable</span></div>
+            <div className="stat"><b>{pct}%</b><span>reviewed · {book.reviewed} of {book.applicable} applicable</span></div>
           </div>
 
-          <div className="panel">
+          <div className="ws-dash">
+            <section className="panel">
+              <h2>Opportunity by target quarter</h2>
+              <Legend />
+              <QuarterColumns quarters={book.byQuarter.map((q) => ({ label: q.label, pair: q.pair }))} />
+            </section>
+            <section className="panel">
+              <h2>Opportunity over time</h2>
+              <Legend />
+              <TrendLines weeks={weeks} />
+              {monthAgo && weeks.length > 1 && (
+                <p className="dim chart-note">
+                  {delta >= 0 ? "+" : "−"}{formatUsd(Math.abs(delta)) || "$0"} total opportunity in the last month
+                  {" · "}{moved.validated} newly validated · {moved.inPlay} moved to In play · {moved.lost} lost (30 days)
+                </p>
+              )}
+            </section>
+          </div>
+
+          <div className="ws-dash three">
+            <section className="panel">
+              <h2>By bank</h2>
+              <RowBars rows={book.byBank.map((b) => ({ label: shortBank(b.name), href: `/banks/${b.slug}/whitespace`, pair: b.pair }))} />
+            </section>
+            <section className="panel">
+              <h2>By product pillar</h2>
+              <RowBars rows={book.byPillar.map((p) => ({ label: p.pillar, href: `/whitespace?pillar=${encodeURIComponent(p.pillar)}#grid`, pair: p.pair }))} />
+            </section>
+            <section className="panel">
+              <h2>Status mix</h2>
+              <ul className="status-mix">
+                {STATUS_KEYS.map((s) => {
+                  const list = book.statusCounts[s];
+                  const acv = list.reduce((sum, r) => sum + Number(r.acv_usd ?? 0), 0);
+                  return (
+                    <li key={s}>
+                      <StatusPill status={s} />
+                      <span className="mix-bar"><i className={`ws-c-${s}`} style={{ width: `${book.applicable ? Math.max(list.length ? 2 : 0, (list.length / book.applicable) * 100) : 0}%` }} /></span>
+                      <b>{list.length}</b>
+                      <span className="dim">{acv ? formatUsd(acv) : ""}</span>
+                    </li>
+                  );
+                })}
+                <li>
+                  <StatusPill status={null} />
+                  <span className="mix-bar"><i className="ws-c-none" style={{ width: `${100 - pct}%` }} /></span>
+                  <b>{book.applicable - book.reviewed}</b><span />
+                </li>
+              </ul>
+            </section>
+          </div>
+
+          <div className="ws-dash">
+            <section className="panel">
+              <h2>Next steps</h2>
+              {book.steps.length === 0 ? <p className="dim">Nothing pressing. Nice work.</p> : (
+                <ul className="next-steps">
+                  {book.steps.map((s, i) => <li key={i} className={s.tone}><Link href={s.href}>{s.text} →</Link></li>)}
+                </ul>
+              )}
+            </section>
+            <section className="panel">
+              <h2>Recent changes</h2>
+              {recent.length === 0 ? <p className="dim">No changes in the last 30 days.</p> : (
+                <ul className="event-list">
+                  {recent.slice(0, 8).map((e, i) => (
+                    <li key={i}>
+                      <span className="when">{day(e.at)}</span>
+                      <span>
+                        <Link href={`/banks/${e.slug}/whitespace`}>{bankName.get(e.slug) ?? e.slug}</Link>
+                        {" · "}{productBySlug(e.product_slug)?.name ?? e.product_slug}: {describeChange(e)}
+                        <span className="dim"> ({nameOf.get(e.actor ?? "")?.split(" ")[0] ?? "someone"})</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+
+          <div className="panel" id="grid">
+            <h2>Every bank and product</h2>
             <div className="ws-grid-head">
               <nav className="scope-tabs" aria-label="Pillar">
-                <Link href="/whitespace" aria-current={!pillar ? "page" : undefined}>All products</Link>
-                {PILLAR_ORDER.map((p) => <Link key={p} href={`/whitespace?pillar=${encodeURIComponent(p)}`} aria-current={pillar === p ? "page" : undefined}>{p}</Link>)}
+                <Link href="/whitespace#grid" aria-current={!pillar ? "page" : undefined}>All products</Link>
+                {PILLAR_ORDER.map((p) => <Link key={p} href={`/whitespace?pillar=${encodeURIComponent(p)}#grid`} aria-current={pillar === p ? "page" : undefined}>{p}</Link>)}
               </nav>
               <div className="ws-legend">
                 {STATUS_KEYS.map((s) => <span key={s}><StatusPill status={s} compact /> {STATUSES[s].short}</span>)}
@@ -116,12 +212,12 @@ export default async function WhitespacePage({ searchParams }: { searchParams: P
                   </tr>
                 </thead>
                 <tbody>
-                  {book.map((i) => {
+                  {book.banks.map((i) => {
                     const lines = linesBy.get(i.slug)!;
                     const mine = totals(wsRows.filter((r) => r.slug === i.slug));
                     return (
                       <tr key={i.slug}>
-                        <th scope="row" className="ws-bank-col"><Link href={`/banks/${i.slug}/whitespace`}>{i.name.replace(/,? (Inc\.|Corporation|Corp\.)$/, "")}</Link></th>
+                        <th scope="row" className="ws-bank-col"><Link href={`/banks/${i.slug}/whitespace`}>{shortBank(i.name)}</Link></th>
                         <td className="ws-sum">{mine.validated.acv ? formatUsd(mine.validated.acv) : "–"}</td>
                         <td className="ws-sum">{mine.inPlay.acv ? formatUsd(mine.inPlay.acv) : "–"}</td>
                         {columns.map((c) => {
