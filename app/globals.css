@@ -691,3 +691,24 @@ thead .ws-sum { vertical-align: bottom; color: var(--muted); font-size: 11px; pa
 .ws-product-list a { color: var(--text-strong); font-weight: 600; }
 .ws-dash .event-list li, .ws-recent li { flex-wrap: nowrap; }
 .ws-dash .event-list .when { width: 56px; }
+.follow.account.on { color: var(--good); border-color: rgba(16, 185, 129, .45); background: rgba(16, 185, 129, .1); }
+.bank-tools .follow.account { padding: 4px 10px; font-size: 12px; height: 30px; }
+
+/* Team view */
+.head-actions { display: flex; align-items: center; gap: 12px 16px; flex-wrap: wrap; }
+.seller-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: -6px 0 16px; align-items: center; }
+.seller-chips a { padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); color: var(--muted); font-size: 13px; font-weight: 600; background: var(--surface); }
+.seller-chips a:hover { text-decoration: none; color: var(--text-strong); }
+.seller-chips a.on { background: rgba(59, 130, 246, .15); border-color: rgba(59, 130, 246, .5); color: var(--accent-text); }
+.seller-chips a .dim { margin-left: 4px; }
+.ws-owner { display: block; font-size: 11px; font-weight: 400; color: var(--subtle); overflow: hidden; text-overflow: ellipsis; }
+table.team-table { min-width: 560px; font-size: 13px; }
+table.team-table th, table.team-table td { padding: 8px 10px; }
+table.team-table tbody tr { cursor: default; }
+.team-pick { list-style: none; margin: 0; padding: 0; }
+.team-pick li { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.team-pick li:last-child { border-bottom: 0; }
+.team-pick label b { color: var(--text-strong); }
+.team-line { margin: 12px 0 0; font-size: 13px; color: var(--muted); }
+.team-line b { color: var(--text-strong); }
+table.team-table td:first-child { white-space: nowrap; }

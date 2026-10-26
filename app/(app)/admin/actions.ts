@@ -13,7 +13,7 @@ export type AdminState = {
   link?: { email: string; kind: LinkKind; url: string; emailed: boolean; emailError?: string };
 } | undefined;
 
-const ROLES = ["pending", "seller", "admin"] as const;
+const ROLES = ["pending", "seller", "manager", "admin"] as const;
 
 const NO_KEY = "Logins can't be managed until SUPABASE_SECRET_KEY is added in Vercel (see the note above).";
 

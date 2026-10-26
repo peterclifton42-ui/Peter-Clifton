@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { requireViewer } from "@/lib/auth";
+import { canManage, requireViewer } from "@/lib/auth";
 import {
   addDays, EVENT_COLUMNS, formatDay, latestAndNext, needsRefresh, todayISO, type EarningsEvent,
 } from "@/lib/earnings";
-import { followedSlugs } from "@/lib/follows";
+import { bookSlugs, followedSlugs } from "@/lib/follows";
 import { categoryLabel, formatAssets, INSTITUTION_COLUMNS, shortQuarter, type Institution } from "@/lib/institutions";
 import { createClient } from "@/lib/supabase/server";
-import { WHITESPACE_COLUMNS, bookOf, formatQuarter, formatUsd, quarterOf, type WhitespaceRow } from "@/lib/whitespace";
+import { WHITESPACE_COLUMNS, bookOf, formatQuarter, formatUsd, quarterOf, totals, type WhitespaceRow } from "@/lib/whitespace";
+import { loadTeam } from "@/lib/team";
 import { FollowButton } from "./follow-button";
 
 export const metadata: Metadata = { title: "Home" };
@@ -37,14 +38,21 @@ export default async function HomePage() {
   for (const n of (newsRows ?? []) as (News & { slug: string })[]) if (!latestNews.has(n.slug)) latestNews.set(n.slug, n);
 
   const mine = all.filter((i) => followed.has(i.slug));
-  const mineSlugs = mine.map((i) => i.slug);
-  const [{ data: research }, { data: wsRows }] = mineSlugs.length
+  // Whitespace covers the seller's book (accounts marked "My account"); managers
+  // also see their team's consolidated book.
+  const [booked, team] = await Promise.all([bookSlugs(viewer.id), canManage(viewer) ? loadTeam(viewer.id) : Promise.resolve([])]);
+  const bookBanks = all.filter((i) => booked.has(i.slug));
+  const teamSlugs = [...new Set(team.flatMap((m) => m.banks))];
+  const wsSlugs = [...new Set([...booked, ...teamSlugs])];
+  const [{ data: research }, { data: wsRows }] = wsSlugs.length
     ? await Promise.all([
-      supabase.from("insight_inputs").select("slug, products, dnr_products").in("slug", mineSlugs),
-      supabase.from("whitespace").select(WHITESPACE_COLUMNS).in("slug", mineSlugs),
+      supabase.from("insight_inputs").select("slug, products, dnr_products").in("slug", wsSlugs),
+      supabase.from("whitespace").select(WHITESPACE_COLUMNS).in("slug", wsSlugs),
     ])
     : [{ data: [] }, { data: [] }];
-  const book = bookOf({ institutions: mine, research: (research ?? []) as never, rows: (wsRows ?? []) as WhitespaceRow[] });
+  const allWs = (wsRows ?? []) as WhitespaceRow[];
+  const teamTotals = team.length > 1 ? totals(allWs.filter((r) => teamSlugs.includes(r.slug))) : null;
+  const book = bookOf({ institutions: bookBanks, research: (research ?? []) as never, rows: allWs.filter((r) => booked.has(r.slug)) });
   const suggestions = all.filter((i) => i.opportunity === "HIGH").slice(0, 6);
   const upcoming = evs.filter((e) => e.event_date >= today && e.event_date <= addDays(today, 14) && e.status !== "reported");
   const stale = evs
@@ -61,7 +69,7 @@ export default async function HomePage() {
         </div>
       </div>
 
-      {mine.length > 0 && (
+      {(bookBanks.length > 0 || teamTotals) && (
         <section className="panel">
           <div className="panel-head">
             <h2>Your whitespace</h2>
@@ -77,6 +85,13 @@ export default async function HomePage() {
             <ul className="next-steps">
               {book.steps.slice(0, 3).map((st, i) => <li key={i} className={st.tone}><Link href={st.href}>{st.text} →</Link></li>)}
             </ul>
+          )}
+          {teamTotals && (
+            <p className="team-line">
+              <b>Your team</b> ({team.length} sellers, {teamSlugs.length} banks): {formatUsd(teamTotals.validated.acv) || "$0"} validated ·{" "}
+              {formatUsd(teamTotals.inPlay.acv) || "$0"} in play · {teamTotals.dueThisQuarter} due this quarter.{" "}
+              <Link href="/whitespace?view=team">Open team view →</Link>
+            </p>
           )}
         </section>
       )}

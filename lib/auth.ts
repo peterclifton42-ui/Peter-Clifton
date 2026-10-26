@@ -2,7 +2,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { createClient } from "./supabase/server";
 
-export type Role = "pending" | "seller" | "admin";
+export type Role = "pending" | "seller" | "manager" | "admin";
 
 export type Viewer = {
   id: string;
@@ -37,3 +37,6 @@ export async function requireAdmin(): Promise<Viewer> {
   if (viewer.role !== "admin") redirect("/");
   return viewer;
 }
+
+// Managers (and admins) see the consolidated team view.
+export const canManage = (v: Pick<Viewer, "role">) => v.role === "manager" || v.role === "admin";

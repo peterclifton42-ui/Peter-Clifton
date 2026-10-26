@@ -14,3 +14,11 @@ export async function setFollowing(slug: string, follow: boolean) {
   }
   revalidatePath("/", "layout");
 }
+
+// Marks a followed bank as one of the seller's own accounts (in their book).
+export async function setMyAccount(slug: string, mine: boolean) {
+  const viewer = await requireViewer();
+  const supabase = await createClient();
+  await supabase.from("favourites").update({ my_account: mine }).eq("user_id", viewer.id).eq("slug", slug);
+  revalidatePath("/", "layout");
+}

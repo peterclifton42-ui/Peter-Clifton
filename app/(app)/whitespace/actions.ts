@@ -73,13 +73,17 @@ function revalidate(slug: string) {
   revalidatePath("/whitespace");
 }
 
-// Admin: remove every demo row and its history.
+// Admin: remove every demo row, its history and snapshots, and the demo sellers.
 export async function clearDemoWhitespace() {
   await requireAdmin();
   if (!adminConfigured()) return;
   const admin = createAdminClient();
   await admin.from("whitespace").delete().eq("is_demo", true);
   await admin.from("whitespace_events").delete().eq("is_demo", true);
+  await admin.from("whitespace_snapshots").delete().eq("is_demo", true);
+  // Demo sellers (their follows and team places go with them).
+  const { data: demoPeople } = await admin.from("profiles").select("id").eq("is_demo", true);
+  for (const p of demoPeople ?? []) await admin.auth.admin.deleteUser(p.id as string);
   revalidatePath("/whitespace");
   revalidatePath("/admin");
 }
