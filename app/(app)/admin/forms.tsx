@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { clearDemoWhitespace } from "../whitespace/actions";
 import { createUser, removeUser, sendEmailPreview, sendPasswordLink, setRole, type AdminState } from "./actions";
 
 function LinkResult({ state }: { state: AdminState }) {
@@ -102,6 +103,15 @@ export function EmailPreviewForm() {
         <button type="submit" name="kind" value="test" className="secondary" disabled={pending}>Send me a test email</button>
         <button type="submit" name="kind" value="digest" className="secondary" disabled={pending}>Send me this week&apos;s digest</button>
       </div>
+    </form>
+  );
+}
+
+export function ClearDemoButton({ count }: { count: number }) {
+  return (
+    <form action={clearDemoWhitespace}
+      onSubmit={(e) => { if (!confirm(`Remove all ${count} demo whitespace entries and their history? Real entries stay.`)) e.preventDefault(); }}>
+      <button type="submit" className="secondary">Clear demo data ({count})</button>
     </form>
   );
 }

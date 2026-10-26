@@ -5,7 +5,7 @@ import { askConfigured } from "@/lib/ask/agent";
 import { emailConfigured } from "@/lib/email/send";
 import { adminConfigured, createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { CreateUserForm, EmailPreviewForm, UserRow } from "./forms";
+import { ClearDemoButton, CreateUserForm, EmailPreviewForm, UserRow } from "./forms";
 
 export const metadata: Metadata = { title: "Admin" };
 
@@ -30,6 +30,10 @@ export default async function AdminPage() {
     const { data: auth } = await createAdminClient().auth.admin.listUsers({ perPage: 500 });
     (auth?.users ?? []).forEach((u) => { if (u.last_sign_in_at) signedIn.add(u.id); });
   }
+  const [{ count: wsTotal }, { count: wsDemo }] = await Promise.all([
+    supabase.from("whitespace").select("id", { count: "exact", head: true }),
+    supabase.from("whitespace").select("id", { count: "exact", head: true }).eq("is_demo", true),
+  ]);
   const emailOf = new Map((users ?? []).map((u) => [u.id as string, (u.full_name || u.email) as string]));
   const askCost = (asks ?? []).reduce((sum, a) => sum + Number(a.cost_usd ?? 0), 0);
   const askUsers = new Set((asks ?? []).map((a) => a.user_id)).size;
@@ -144,6 +148,15 @@ export default async function AdminPage() {
             </ul>
           </>
         )}
+      </div>
+
+      <div className="panel">
+        <h2>Whitespace</h2>
+        <p>
+          <b>{wsTotal ?? 0}</b> product statuses set across all banks{(wsDemo ?? 0) > 0 && <>, of which <b>{wsDemo}</b> are demo data</>}.{" "}
+          <Link href="/whitespace">Open Whitespace →</Link>
+        </p>
+        {(wsDemo ?? 0) > 0 && <ClearDemoButton count={wsDemo ?? 0} />}
       </div>
 
       <div className="panel">
