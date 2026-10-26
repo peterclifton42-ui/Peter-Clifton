@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { requireViewer } from "@/lib/auth";
-import { followedSlugs } from "@/lib/follows";
+import { canManage, requireViewer } from "@/lib/auth";
+import { bookSlugs } from "@/lib/follows";
+import { loadTeam, ownersByBank } from "@/lib/team";
 import { PILLAR_ORDER, PRODUCTS, productBySlug } from "@/lib/products";
 import { memberNames } from "@/lib/people";
 import { createClient } from "@/lib/supabase/server";
 import {
-  EVENT_COLUMNS, STATUSES, STATUS_KEYS, WHITESPACE_COLUMNS, bookOf, describeChange, formatQuarter, formatUsd, quarterOf, totals, weeklyTrend,
+  EVENT_COLUMNS, STATUSES, STATUS_KEYS, WHITESPACE_COLUMNS, addToPair, bookOf, emptyPair, lostExpired, describeChange, formatQuarter, formatUsd, quarterOf, totals, weeklyTrend,
   type Institution, type ProductLine, type WhitespaceEvent, type WhitespaceRow,
 } from "@/lib/whitespace";
 import { Legend, QuarterColumns, RowBars, TrendLines } from "./charts";
@@ -23,12 +24,31 @@ const day = (iso: string) => new Date(iso).toLocaleDateString("en-US", { day: "n
 
 // The seller's book of business (the banks they follow): headline numbers,
 // charts, next steps, recent changes and a bank x product grid editable in place.
-export default async function WhitespacePage({ searchParams }: { searchParams: Promise<{ pillar?: string }> }) {
+export default async function WhitespacePage({ searchParams }: { searchParams: Promise<{ pillar?: string; view?: string; sellers?: string }> }) {
   const viewer = await requireViewer();
-  const requested = (await searchParams).pillar ?? "";
-  const pillar = PILLAR_ORDER.includes(requested) ? requested : null;
-  const followed = [...await followedSlugs(viewer.id)];
+  const params = await searchParams;
+  const pillar = PILLAR_ORDER.includes(params.pillar ?? "") ? params.pillar! : null;
+  // Managers switch between their own book and the team's consolidated book.
+  const manager = canManage(viewer);
+  const teamView = manager && params.view === "team";
+  const members = teamView ? await loadTeam(viewer.id) : [];
+  const picked = (params.sellers ?? "").split(",").filter((id) => members.some((m) => m.id === id));
+  const shown = picked.length ? members.filter((m) => picked.includes(m.id)) : members;
+  const owners = ownersByBank(shown);
+  const followed = teamView ? [...owners.keys()] : [...await bookSlugs(viewer.id)];
   const supabase = await createClient();
+  // Links keep the current view and seller filter.
+  const qs = (extra: Record<string, string | null>) => {
+    const q = new URLSearchParams();
+    const all = { view: teamView ? "team" : null, sellers: picked.length ? picked.join(",") : null, pillar, ...extra };
+    Object.entries(all).forEach(([k, v]) => { if (v) q.set(k, v); });
+    const str = q.toString();
+    return `/whitespace${str ? `?${str}` : ""}`;
+  };
+  const toggleSeller = (id: string) => {
+    const next = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id];
+    return qs({ sellers: next.length && next.length < members.length ? next.join(",") : null });
+  };
   const since = new Date(Date.now() - 30 * 86400 * 1000).toISOString();
   const [{ data: insts }, { data: research }, { data: rows }, { data: snaps }, { data: events }, people] = followed.length
     ? await Promise.all([
@@ -51,8 +71,25 @@ export default async function WhitespacePage({ searchParams }: { searchParams: P
   const monthAgo = weeks.length > 4 ? weeks[weeks.length - 5] : weeks[0];
   const delta = monthAgo ? t.validated.acv + t.inPlay.acv - (monthAgo.validated + monthAgo.inPlay) : 0;
   const nameOf = people;
-  const bankName = new Map(book.banks.map((i) => [i.slug, shortBank(i.name)]));
   const recent = ((events ?? []) as WhitespaceEvent[]);
+  const bankName = new Map(book.banks.map((i) => [i.slug, shortBank(i.name)]));
+  const ownerNames = (slug: string) => (owners.get(slug) ?? []).map((m) => m.name.split(" ")[0]).join(", ");
+  // In the team view, each next step names whose bank it is.
+  const steps = book.steps.map((st) => {
+    const slug = st.href.match(/^\/banks\/([^/]+)/)?.[1];
+    // Only steps about one bank ("Review ... at X") belong to a seller; the rest are team-wide.
+    return teamView && slug && owners.has(slug) && st.text.startsWith("Review") ? { ...st, text: `${ownerNames(slug)}: ${st.text}` } : st;
+  });
+  // Per-seller rollups for the team view (a bank shared by two sellers counts for both here, once in the totals).
+  const sellerRows = shown.map((m) => {
+    const pair = emptyPair();
+    for (const r of wsRows) if (m.banks.includes(r.slug) && !lostExpired(r)) addToPair(pair, r.status, r.acv_usd);
+    const lines = m.banks.flatMap((slug) => (linesBy.get(slug) ?? []).filter((l) => l.applies.ok));
+    const reviewed = lines.filter((l) => l.row && !l.expired).length;
+    const mine = recent.filter((e) => e.actor === m.id);
+    const last = [...wsRows.filter((r) => r.updated_by === m.id).map((r) => r.updated_at), ...mine.map((e) => e.at)].sort().pop();
+    return { m, pair, banks: m.banks.length, reviewedPct: lines.length ? Math.round((reviewed / lines.length) * 100) : 0, changes: mine.length, last };
+  });
   const moved = {
     validated: recent.filter((e) => e.new_status === "validated" && e.old_status !== "validated").length,
     inPlay: recent.filter((e) => e.new_status === "in_play" && e.old_status !== "in_play").length,
@@ -84,15 +121,42 @@ export default async function WhitespacePage({ searchParams }: { searchParams: P
     <main className="page page-wide">
       <div className="page-head">
         <div>
-          <h1>Whitespace {demo && <span className="badge status-estimated">Includes demo data</span>}</h1>
-          <p>Your book of business: the {book.banks.length} {book.banks.length === 1 ? "bank" : "banks"} you follow. Statuses are shared with everyone on each account.</p>
+          <h1>{teamView ? "Team whitespace" : "Whitespace"} {demo && <span className="badge status-estimated">Includes demo data</span>}</h1>
+          <p>
+            {teamView
+              ? <>The consolidated book of {shown.length === members.length ? "your team" : shown.map((m) => m.name.split(" ")[0]).join(", ")}: {book.banks.length} {book.banks.length === 1 ? "bank" : "banks"}. A bank in two books counts once in the totals.</>
+              : <>Your book of business: the {book.banks.length} {book.banks.length === 1 ? "bank" : "banks"} marked as your accounts. Statuses are shared with everyone on each account.</>}
+          </p>
         </div>
-        {book.banks.length > 0 && <a href="#grid">Jump to the grid ↓</a>}
+        <div className="head-actions">
+          {manager && (
+            <nav className="view-switch" aria-label="View">
+              <Link href="/whitespace" className={!teamView ? "active" : ""}>My book</Link>
+              <Link href="/whitespace?view=team" className={teamView ? "active" : ""}>My team</Link>
+            </nav>
+          )}
+          {teamView && <Link href="/whitespace/team">Manage team</Link>}
+          {book.banks.length > 0 && <a href="#grid">Jump to the grid ↓</a>}
+        </div>
       </div>
+
+      {teamView && (
+        <div className="seller-chips" aria-label="Filter by seller">
+          <Link href={qs({ sellers: null })} className={!picked.length ? "on" : ""}>Everyone ({members.length})</Link>
+          {members.map((m) => (
+            <Link key={m.id} href={toggleSeller(m.id)} className={picked.includes(m.id) ? "on" : ""}>
+              {m.name} <span className="dim">{m.banks.length}</span>
+            </Link>
+          ))}
+          {members.length === 1 && <span className="dim">Your team is just you so far. <Link href="/whitespace/team">Pick your sellers →</Link></span>}
+        </div>
+      )}
 
       {book.banks.length === 0 ? (
         <div className="panel">
-          <p>Your book is built from the banks you follow. <Link href="/banks">Follow a few banks</Link> (☆) and they&apos;ll appear here, ready to review.</p>
+          {teamView
+            ? <p>No banks in these books yet. Sellers add banks to their book by following them (☆) and ticking <b>My account</b> on the bank page.</p>
+            : <p>Your book is the banks you follow (☆) and mark as <b>My account</b> on the bank page. <Link href="/banks">Find your banks</Link> to get started.</p>}
         </div>
       ) : (
         <>
@@ -122,6 +186,37 @@ export default async function WhitespacePage({ searchParams }: { searchParams: P
             </section>
           </div>
 
+          {teamView && (
+            <div className="ws-dash">
+              <section className="panel">
+                <h2>By seller</h2>
+                <Legend />
+                <RowBars rows={sellerRows.map((r) => ({ label: r.m.name, href: toggleSeller(r.m.id), pair: r.pair }))} />
+              </section>
+              <section className="panel">
+                <h2>Team activity</h2>
+                <div className="table-wrap flat">
+                  <table className="team-table">
+                    <thead><tr><th>Seller</th><th className="num">Banks</th><th className="num">Reviewed</th><th className="num">Validated</th><th className="num">In play</th><th className="num">Changes (30d)</th><th>Last update</th></tr></thead>
+                    <tbody>
+                      {sellerRows.map((r) => (
+                        <tr key={r.m.id}>
+                          <td><Link href={qs({ sellers: r.m.id })}>{r.m.name}</Link></td>
+                          <td className="num">{r.banks}</td>
+                          <td className="num"><span className={r.reviewedPct < 25 ? "warn-text" : ""}>{r.reviewedPct}%</span></td>
+                          <td className="num">{formatUsd(r.pair.validated) || "–"}</td>
+                          <td className="num">{formatUsd(r.pair.inPlay) || "–"}</td>
+                          <td className="num">{r.changes}</td>
+                          <td className="dim">{r.last ? day(r.last) : "–"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </div>
+          )}
+
           <div className="ws-dash three">
             <section className="panel">
               <h2>By bank</h2>
@@ -129,7 +224,7 @@ export default async function WhitespacePage({ searchParams }: { searchParams: P
             </section>
             <section className="panel">
               <h2>By product pillar</h2>
-              <RowBars rows={book.byPillar.map((p) => ({ label: p.pillar, href: `/whitespace?pillar=${encodeURIComponent(p.pillar)}#grid`, pair: p.pair }))} />
+              <RowBars rows={book.byPillar.map((p) => ({ label: p.pillar, href: `${qs({ pillar: p.pillar })}#grid`, pair: p.pair }))} />
             </section>
             <section className="panel">
               <h2>Status mix</h2>
@@ -158,9 +253,9 @@ export default async function WhitespacePage({ searchParams }: { searchParams: P
           <div className="ws-dash">
             <section className="panel">
               <h2>Next steps</h2>
-              {book.steps.length === 0 ? <p className="dim">Nothing pressing. Nice work.</p> : (
+              {steps.length === 0 ? <p className="dim">Nothing pressing. Nice work.</p> : (
                 <ul className="next-steps">
-                  {book.steps.map((s, i) => <li key={i} className={s.tone}><Link href={s.href}>{s.text} →</Link></li>)}
+                  {steps.map((s, i) => <li key={i} className={s.tone}><Link href={s.href}>{s.text} →</Link></li>)}
                 </ul>
               )}
             </section>
@@ -187,8 +282,8 @@ export default async function WhitespacePage({ searchParams }: { searchParams: P
             <h2>Every bank and product</h2>
             <div className="ws-grid-head">
               <nav className="scope-tabs" aria-label="Pillar">
-                <Link href="/whitespace#grid" aria-current={!pillar ? "page" : undefined}>All products</Link>
-                {PILLAR_ORDER.map((p) => <Link key={p} href={`/whitespace?pillar=${encodeURIComponent(p)}#grid`} aria-current={pillar === p ? "page" : undefined}>{p}</Link>)}
+                <Link href={`${qs({ pillar: null })}#grid`} aria-current={!pillar ? "page" : undefined}>All products</Link>
+                {PILLAR_ORDER.map((p) => <Link key={p} href={`${qs({ pillar: p })}#grid`} aria-current={pillar === p ? "page" : undefined}>{p}</Link>)}
               </nav>
               <div className="ws-legend">
                 {STATUS_KEYS.map((s) => <span key={s}><StatusPill status={s} compact /> {STATUSES[s].short}</span>)}
@@ -217,7 +312,7 @@ export default async function WhitespacePage({ searchParams }: { searchParams: P
                     const mine = totals(wsRows.filter((r) => r.slug === i.slug));
                     return (
                       <tr key={i.slug}>
-                        <th scope="row" className="ws-bank-col"><Link href={`/banks/${i.slug}/whitespace`}>{shortBank(i.name)}</Link></th>
+                        <th scope="row" className="ws-bank-col"><Link href={`/banks/${i.slug}/whitespace`}>{shortBank(i.name)}</Link>{teamView && <span className="ws-owner">{ownerNames(i.slug)}</span>}</th>
                         <td className="ws-sum">{mine.validated.acv ? formatUsd(mine.validated.acv) : "–"}</td>
                         <td className="ws-sum">{mine.inPlay.acv ? formatUsd(mine.inPlay.acv) : "–"}</td>
                         {columns.map((c) => {

@@ -84,3 +84,12 @@ Sellers record, for each bank and Curinos product, what the account team knows: 
 - **Home** shows a "Your whitespace" card; **product pages** show the product's status across your book and the team's pursuits; the **Ask** assistant reads it all through `get_whitespace`.
 - ACV accepts `250k`, `1.2m` or a bare number under 1,000, read as thousands.
 
+## Managers and team view
+
+- **Roles:** Pending, Seller, **Manager** (a seller who also gets a team view) and Admin (everything, including a team view). Set in Admin → People.
+- **A seller's book** is the banks they follow (☆) *and* mark **My account** on the bank page (`favourites.my_account`, on by default). Banks followed for news only don't count in whitespace totals.
+- **Teams:** a manager picks their sellers at Whitespace → My team → **Manage team** (`team_members`); a seller can be on several teams and admins can edit any. Row-level security lets a manager read only their own team's follows (`manages()` policy on `favourites`).
+- **Team view** (`/whitespace?view=team`, with `&sellers=` to filter): consolidated numbers and charts (a bank in two books counts once), By seller, Team activity (banks, % reviewed, validated, in play, changes in 30 days, last update), next steps naming the seller, and the grid with each bank's owners.
+- Home shows managers a "Your team" line; product pages show "Your team" pursuits; Ask's `get_whitespace` takes `team` and `seller`.
+- **Demo sellers** (`profiles.is_demo`): three sellers with regional books and back-dated history on the owner's team; they can't sign in, get no email, and Admin → Whitespace → Clear demo data removes them with the rest of the demo data.
+

@@ -8,6 +8,7 @@ import {
 } from "../insights";
 import { compareDashboards } from "../changes";
 import { METRICS } from "../metrics";
+import { loadTeam } from "../team";
 import { PRODUCTS, effectivePriority, productBySlug, productFor, sellerBlocks, statusLabel } from "../products";
 import {
   EVENT_COLUMNS as WS_EVENT_COLUMNS, STATUSES, WHITESPACE_COLUMNS, bookOf, describeChange, formatQuarter, lostExpired,
@@ -179,13 +180,15 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "get_whitespace",
-    description: "The account teams' whitespace: for each institution and product, a shared status set by sellers - validated whitespace (target quarter, ACV in USD), in play (pipeline, ACV), recently lost pipeline (within 12 months) or renewal (within 24 months, avoid for now), current client, or not a fit; anything else is not reviewed. With no arguments: the user's book (the banks they follow) with totals, by-quarter and by-bank rollups, next steps and changes in the last 30 days. Narrow with slug (one institution) or product (one product across the book, or across all banks with all_banks).",
+    description: "The account teams' whitespace: for each institution and product, a shared status set by sellers - validated whitespace (target quarter, ACV in USD), in play (pipeline, ACV), recently lost pipeline (within 12 months) or renewal (within 24 months, avoid for now), current client, or not a fit; anything else is not reviewed. With no arguments: the user's book (banks they follow and mark as their own accounts) with totals, by-quarter and by-bank rollups, next steps and changes in the last 30 days. Narrow with slug (one institution) or product (one product across the book, or across all banks with all_banks). Managers can set team to see their team's consolidated book, with a per-seller breakdown, and seller to focus on one team member.",
     input_schema: {
       type: "object",
       properties: {
         slug: { type: "string", description: "One institution's slug." },
         product: { type: "string", description: "Product slug or name." },
         all_banks: { type: "boolean", description: "Include every institution, not only the user's book." },
+        team: { type: "boolean", description: "Managers only: the consolidated book of the user's team." },
+        seller: { type: "string", description: "With team: one team member's name (or first name)." },
       },
       additionalProperties: false,
     },
@@ -218,7 +221,7 @@ const TOOL_LABELS: Record<string, (input: Record<string, unknown>) => string> = 
   get_dashboard_history: (i) => `Reading the version history of ${i.slug}`,
   get_market_insights: (i) => (i.theme ? `Reading the evidence for “${i.theme}”` : "Reading market insights"),
   get_product: (i) => `Looking up ${i.product}`,
-  get_whitespace: (i) => (i.slug ? `Checking whitespace at ${i.slug}` : i.product ? `Checking whitespace for ${i.product}` : "Checking your whitespace"),
+  get_whitespace: (i) => (i.slug ? `Checking whitespace at ${i.slug}` : i.product ? `Checking whitespace for ${i.product}` : i.team ? `Checking your team's whitespace${i.seller ? ` (${i.seller})` : ""}` : "Checking your whitespace"),
 };
 
 export function toolLabel(name: string, input: unknown) {
@@ -386,9 +389,22 @@ export async function runTool(name: string, rawInput: unknown, ctx: Ctx): Promis
       const productKey = str(input.product);
       const product = productKey ? productBySlug(productKey) ?? productFor(productKey) ?? PRODUCTS.find((p) => p.name.toLowerCase().includes(productKey.toLowerCase())) : null;
       if (productKey && !product) return `Unknown product "${productKey}".`;
-      const follows = await followed(ctx);
-      const scope = slug ? [slug] : bool(input.all_banks) ? null : [...follows];
-      if (scope && scope.length === 0) return "The user follows no banks, so their book is empty. Suggest following banks (the star on Banks) and setting statuses on the Whitespace page.";
+      // The book: followed banks marked "My account"; for a manager's team, every member's book.
+      let members: { id: string; name: string; banks: string[] }[] = [];
+      if (bool(input.team)) {
+        const { data: me } = await ctx.db.from("profiles").select("role").eq("id", ctx.userId).single();
+        if (me?.role !== "manager" && me?.role !== "admin") return "Only managers have a team view. Answer from the user's own book instead (call again without team).";
+        members = await loadTeam(ctx.userId);
+        const who = str(input.seller)?.toLowerCase();
+        if (who) {
+          members = members.filter((m) => m.name.toLowerCase().includes(who));
+          if (!members.length) return `No one on the user's team matches "${input.seller}".`;
+        }
+      }
+      const { data: own } = await ctx.db.from("favourites").select("slug").eq("user_id", ctx.userId).eq("my_account", true);
+      const book = bool(input.team) ? [...new Set(members.flatMap((m) => m.banks))] : (own ?? []).map((f) => f.slug as string);
+      const scope = slug ? [slug] : bool(input.all_banks) ? null : book;
+      if (scope && scope.length === 0) return bool(input.team) ? "The team's books are empty: sellers add banks by following them and ticking My account on the bank page." : "The user's book is empty. Their book is the banks they follow (star) and mark as My account on the bank page; then they set statuses on the Whitespace page.";
       let q = ctx.db.from("whitespace").select(WHITESPACE_COLUMNS);
       let iq = ctx.db.from("institutions").select("slug, name, category, assets_b");
       let rq = ctx.db.from("insight_inputs").select("slug, products, dnr_products");
@@ -404,16 +420,23 @@ export async function runTool(name: string, rawInput: unknown, ctx: Ctx): Promis
         quarter: r.target_quarter ? formatQuarter(r.target_quarter) : undefined, acv_usd: r.acv_usd ?? undefined,
         lost: r.lost_on ?? undefined, note: r.note ?? undefined, updated: r.updated_at.slice(0, 10), demo: r.is_demo || undefined,
       }));
-      const book = slug || product ? null : bookOf({ institutions: (insts ?? []) as never, research: (research ?? []) as never, rows: (rows ?? []) as WhitespaceRow[] });
+      const summary = slug || product ? null : bookOf({ institutions: (insts ?? []) as never, research: (research ?? []) as never, rows: (rows ?? []) as WhitespaceRow[] });
       return clip({
-        scope: slug ? names.get(slug) ?? slug : bool(input.all_banks) ? "all institutions" : "the user's book (followed banks)",
+        scope: slug ? names.get(slug) ?? slug : bool(input.all_banks) ? "all institutions" : bool(input.team) ? `the team's consolidated book (${members.map((m) => m.name).join(", ")})` : "the user's book (their accounts)",
         note: "Statuses are shared by the account team; ACV is annual contract value in USD. Rows marked demo are sample data.",
-        ...(book && {
-          totals: { validated_acv: book.totals.validated.acv, validated: book.totals.validated.count, in_play_acv: book.totals.inPlay.acv, in_play: book.totals.inPlay.count, recently_lost: book.totals.lost, due_by_this_quarter: book.totals.dueThisQuarter, reviewed: `${book.reviewed} of ${book.applicable} applicable` },
-          by_quarter: book.byQuarter.map((x) => ({ quarter: x.label, validated_acv: x.pair.validated, in_play_acv: x.pair.inPlay })),
-          by_bank: book.byBank.map((x) => ({ institution: x.name, validated_acv: x.pair.validated, in_play_acv: x.pair.inPlay })),
-          next_steps: book.steps.map((x) => x.text),
-          not_reviewed_but_research_backed: book.banks.map((i) => ({ institution: i.name, products: book.lines.get(i.slug)!.filter((l) => l.applies.ok && !l.row && l.priority != null && l.priority <= 2).map((l) => `${l.product.name} (P${l.priority})`) })).filter((x) => x.products.length),
+        ...(summary && {
+          totals: { validated_acv: summary.totals.validated.acv, validated: summary.totals.validated.count, in_play_acv: summary.totals.inPlay.acv, in_play: summary.totals.inPlay.count, recently_lost: summary.totals.lost, due_by_this_quarter: summary.totals.dueThisQuarter, reviewed: `${summary.reviewed} of ${summary.applicable} applicable` },
+          by_quarter: summary.byQuarter.map((x) => ({ quarter: x.label, validated_acv: x.pair.validated, in_play_acv: x.pair.inPlay })),
+          by_bank: summary.byBank.map((x) => ({ institution: x.name, owners: members.filter((m) => m.banks.includes(x.slug)).map((m) => m.name), validated_acv: x.pair.validated, in_play_acv: x.pair.inPlay })),
+          ...(members.length > 0 && {
+            by_seller: members.map((m) => {
+              const mine = ((rows ?? []) as WhitespaceRow[]).filter((r) => m.banks.includes(r.slug) && !lostExpired(r));
+              const sum = (st: string) => mine.filter((r) => r.status === st).reduce((t, r) => t + Number(r.acv_usd ?? 0), 0);
+              return { seller: m.name, banks: m.banks.map((b) => names.get(b) ?? b), validated_acv: sum("validated"), in_play_acv: sum("in_play"), statuses_set: mine.length };
+            }),
+          }),
+          next_steps: summary.steps.map((x) => x.text),
+          not_reviewed_but_research_backed: summary.banks.map((i) => ({ institution: i.name, products: summary.lines.get(i.slug)!.filter((l) => l.applies.ok && !l.row && l.priority != null && l.priority <= 2).map((l) => `${l.product.name} (P${l.priority})`) })).filter((x) => x.products.length),
         }),
         statuses: list,
         changes_last_30_days: ((events ?? []) as WhitespaceEvent[]).map((e) => ({ when: e.at.slice(0, 10), institution: names.get(e.slug) ?? e.slug, product: pname(e.product_slug), change: describeChange(e) })),

@@ -9,7 +9,7 @@ type Person = { id: string; email: string; full_name: string | null };
 type Prefs = { instant: boolean; digest: boolean };
 
 async function people(db: SupabaseClient, ids?: string[]) {
-  let q = db.from("profiles").select("id, email, full_name").in("role", ["seller", "admin"]);
+  let q = db.from("profiles").select("id, email, full_name").in("role", ["seller", "manager", "admin"]).eq("is_demo", false);
   if (ids) q = q.in("id", ids);
   const [{ data: profiles }, { data: prefs }] = await Promise.all([
     q, db.from("email_preferences").select("user_id, instant, digest"),

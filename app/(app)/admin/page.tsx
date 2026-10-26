@@ -14,7 +14,7 @@ export default async function AdminPage() {
   const supabase = await createClient();
   const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString();
   const [{ data: users }, { data: runs }, { data: institutions }, { data: emails }, { data: asks }, { data: flagged }] = await Promise.all([
-    supabase.from("profiles").select("id, email, full_name, role, created_at").order("created_at"),
+    supabase.from("profiles").select("id, email, full_name, role, created_at, is_demo").order("created_at"),
     supabase.from("refresh_runs").select("id, job, slug, started_at, finished_at, status, note")
       .order("started_at", { ascending: false }).limit(12),
     supabase.from("institutions").select("slug, name"),
@@ -34,6 +34,7 @@ export default async function AdminPage() {
     supabase.from("whitespace").select("id", { count: "exact", head: true }),
     supabase.from("whitespace").select("id", { count: "exact", head: true }).eq("is_demo", true),
   ]);
+  const demoSellers = (users ?? []).filter((u) => (u as { is_demo?: boolean }).is_demo).length;
   const emailOf = new Map((users ?? []).map((u) => [u.id as string, (u.full_name || u.email) as string]));
   const askCost = (asks ?? []).reduce((sum, a) => sum + Number(a.cost_usd ?? 0), 0);
   const askUsers = new Set((asks ?? []).map((a) => a.user_id)).size;
@@ -153,7 +154,8 @@ export default async function AdminPage() {
       <div className="panel">
         <h2>Whitespace</h2>
         <p>
-          <b>{wsTotal ?? 0}</b> product statuses set across all banks{(wsDemo ?? 0) > 0 && <>, of which <b>{wsDemo}</b> are demo data</>}.{" "}
+          <b>{wsTotal ?? 0}</b> product statuses set across all banks{(wsDemo ?? 0) > 0 && <>, of which <b>{wsDemo}</b> are demo data</>}
+          {demoSellers > 0 && <>, plus <b>{demoSellers}</b> demo sellers on your team</>}.{" "}
           <Link href="/whitespace">Open Whitespace →</Link>
         </p>
         {(wsDemo ?? 0) > 0 && <ClearDemoButton count={wsDemo ?? 0} />}

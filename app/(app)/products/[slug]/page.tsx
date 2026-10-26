@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireViewer } from "@/lib/auth";
-import { followedSlugs } from "@/lib/follows";
+import { canManage, requireViewer } from "@/lib/auth";
+import { bookSlugs, followedSlugs } from "@/lib/follows";
+import { loadTeam } from "@/lib/team";
 import { formatAssets } from "@/lib/institutions";
 import { inScope, parseScope, type InsightInput } from "@/lib/insights";
 import { CATALOGUE_SOURCE, boldParts, effectivePriority, productBySlug, productFor, sellerBlocks, statusLabel } from "@/lib/products";
@@ -55,7 +56,10 @@ export default async function ProductPage({ params, searchParams }: Props) {
   const { data: wsData } = await supabase.from("whitespace").select(WHITESPACE_COLUMNS).eq("product_slug", product.slug);
   const ws = ((wsData ?? []) as WhitespaceRow[]).filter((w) => !lostExpired(w));
   const names = new Map((data ?? []).map((r) => [r.slug as string, r.name as string]));
-  const inBook = ws.filter((w) => followed.has(w.slug)).sort((a, b) => STATUS_KEYS.indexOf(a.status) - STATUS_KEYS.indexOf(b.status));
+  const [booked, team] = await Promise.all([bookSlugs(viewer.id), canManage(viewer) ? loadTeam(viewer.id) : Promise.resolve([])]);
+  const teamBanks = new Set(team.flatMap((m) => m.banks));
+  const teamHere = ws.filter((w) => teamBanks.has(w.slug) && (w.status === "validated" || w.status === "in_play"));
+  const inBook = ws.filter((w) => booked.has(w.slug)).sort((a, b) => STATUS_KEYS.indexOf(a.status) - STATUS_KEYS.indexOf(b.status));
   const teamPursuits = ws.filter((w) => w.status === "validated" || w.status === "in_play");
   const teamAcv = teamPursuits.reduce((sum, w) => sum + Number(w.acv_usd ?? 0), 0);
   const status = statusLabel(product);
@@ -85,10 +89,11 @@ export default async function ProductPage({ params, searchParams }: Props) {
           <div className="panel-head">
             <h2>Whitespace</h2>
             <span className="dim">
-              Across the team: {teamPursuits.length} {teamPursuits.length === 1 ? "pursuit" : "pursuits"}{teamAcv ? `, ${formatUsd(teamAcv)} ACV` : ""}
+              {team.length > 1 && <>Your team: {teamHere.length} {teamHere.length === 1 ? "pursuit" : "pursuits"}, {formatUsd(teamHere.reduce((t, w) => t + Number(w.acv_usd ?? 0), 0)) || "$0"} · </>}
+              All sellers: {teamPursuits.length} {teamPursuits.length === 1 ? "pursuit" : "pursuits"}{teamAcv ? `, ${formatUsd(teamAcv)} ACV` : ""}
             </span>
           </div>
-          {inBook.length === 0 ? <p className="dim">Not set at any bank you follow yet.</p> : (
+          {inBook.length === 0 ? <p className="dim">Not set at any account in your book yet.</p> : (
             <ul className="ws-product-list">
               {inBook.map((w) => (
                 <li key={w.slug}>

@@ -2,12 +2,11 @@ import Link from "next/link";
 import { cache } from "react";
 import { requireViewer } from "@/lib/auth";
 import { EVENT_COLUMNS, formatDay, latestAndNext, needsRefresh, todayISO, type EarningsEvent } from "@/lib/earnings";
-import { followedSlugs } from "@/lib/follows";
 import { categoryLabel, formatAssets, shortQuarter, INSTITUTION_COLUMNS, type Institution } from "@/lib/institutions";
 import { suggestPeers } from "@/lib/metrics";
 import { createClient } from "@/lib/supabase/server";
 import { AskDrawer } from "../../ask/ask-chat";
-import { FollowButton } from "../../follow-button";
+import { AccountToggle, FollowButton } from "../../follow-button";
 import { RefreshMenu } from "./bank-actions";
 
 export type BankInstitution = Institution & { current_snapshot_id: number | null };
@@ -29,9 +28,9 @@ export async function BankBar({ institution, researchedAt, view }: {
   const viewer = await requireViewer();
   const supabase = await createClient();
   const today = todayISO();
-  const [{ data: events }, followed, { count: versions }, { data: all }, { count: newsTotal }, { data: requests }] = await Promise.all([
+  const [{ data: events }, { data: fav }, { count: versions }, { data: all }, { count: newsTotal }, { data: requests }] = await Promise.all([
     supabase.from("earnings_events").select(EVENT_COLUMNS).eq("slug", slug),
-    followedSlugs(viewer.id),
+    supabase.from("favourites").select("my_account").eq("user_id", viewer.id).eq("slug", slug).maybeSingle(),
     supabase.from("snapshots").select("id", { count: "exact", head: true }).eq("slug", slug),
     supabase.from("institutions").select("slug, category, assets_b"),
     supabase.from("news_items").select("id", { count: "exact", head: true }).eq("slug", slug),
@@ -66,7 +65,8 @@ export async function BankBar({ institution, researchedAt, view }: {
         <Link href={`/compare?ids=${[slug, ...suggestPeers(slug, all ?? [])].join(",")}`}>Compare peers</Link>
         {(newsTotal ?? 0) > 0 && <Link href={`/banks/${slug}/news`}>News history ({newsTotal})</Link>}
         <RefreshMenu slug={slug} requested={request} />
-        <FollowButton slug={slug} name={institution.name} following={followed.has(slug)} />
+        <FollowButton slug={slug} name={institution.name} following={Boolean(fav)} />
+        {fav && <AccountToggle slug={slug} mine={fav.my_account} />}
         <AskDrawer context={{ kind: "bank", slug, name: institution.name }} />
       </span>
     </div>

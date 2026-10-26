@@ -42,6 +42,7 @@ export function CreateUserForm() {
           <label htmlFor="role">Role</label>
           <select id="role" name="role" defaultValue="seller">
             <option value="seller">Seller</option>
+            <option value="manager">Manager</option>
             <option value="admin">Admin</option>
           </select>
         </div>
@@ -68,6 +69,7 @@ export function UserRow({ id, email, fullName, role, isSelf, signedIn }: UserRow
           <select name="role" defaultValue={role} disabled={isSelf} aria-label={`Role for ${email}`}>
             <option value="pending">Pending (no access)</option>
             <option value="seller">Seller</option>
+            <option value="manager">Manager (seller + team view)</option>
             <option value="admin">Admin</option>
           </select>
           {!isSelf && <button type="submit" className="secondary">Save role</button>}
@@ -110,7 +112,7 @@ export function EmailPreviewForm() {
 export function ClearDemoButton({ count }: { count: number }) {
   return (
     <form action={clearDemoWhitespace}
-      onSubmit={(e) => { if (!confirm(`Remove all ${count} demo whitespace entries and their history? Real entries stay.`)) e.preventDefault(); }}>
+      onSubmit={(e) => { if (!confirm(`Remove all ${count} demo whitespace entries, their history and the demo sellers? Real entries stay.`)) e.preventDefault(); }}>
       <button type="submit" className="secondary">Clear demo data ({count})</button>
     </form>
   );
