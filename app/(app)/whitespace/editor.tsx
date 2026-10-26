@@ -86,7 +86,7 @@ function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void
             </div>
             <div className="field">
               <label htmlFor="ws-acv">Opportunity (ACV, USD)</label>
-              <input id="ws-acv" name="acv" inputMode="decimal" placeholder="e.g. 250k" defaultValue={target.row?.acv_usd ? formatUsd(target.row.acv_usd).replace("$", "") : ""} />
+              <input id="ws-acv" name="acv" inputMode="decimal" placeholder="e.g. 250k or 1.2m" defaultValue={target.row?.acv_usd ? formatUsd(target.row.acv_usd).replace("$", "") : ""} />
             </div>
           </div>
         )}

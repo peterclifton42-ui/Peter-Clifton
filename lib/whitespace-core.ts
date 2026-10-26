@@ -46,13 +46,15 @@ export function formatUsd(n: number | null | undefined) {
   if (n >= 1e3) return `$${Math.round(n / 1e3)}K`;
   return `$${Math.round(n)}`;
 }
-// "250k", "$1.2m", "250,000" -> dollars; null if blank; NaN if unreadable.
+// "250k", "$1.2m", "250,000", "300" (thousands) -> dollars; null if blank; NaN if unreadable.
 export function parseUsd(input: string): number | null {
   const s = input.trim().toLowerCase().replace(/[$,\s]/g, "");
   if (!s) return null;
   const m = s.match(/^(\d+(?:\.\d+)?)([km]?)$/);
   if (!m) return NaN;
-  return Math.round(Number(m[1]) * (m[2] === "m" ? 1e6 : m[2] === "k" ? 1e3 : 1));
+  // A bare number under 1,000 is read as thousands: an ACV of $300 is never meant.
+  const unit = m[2] === "m" ? 1e6 : m[2] === "k" || Number(m[1]) < 1000 ? 1e3 : 1;
+  return Math.round(Number(m[1]) * unit);
 }
 
 // ---- Lost deals expire: after the window they are eligible again.
@@ -66,3 +68,12 @@ export function lostExpired(row: Pick<WhitespaceRow, "status" | "lost_on">, toda
   return Boolean(window && row.lost_on && monthsAgo(row.lost_on, today) >= window);
 }
 
+
+// Validated and in-play opportunity, summed (the two series every chart shows).
+export type Pair = { validated: number; inPlay: number; vCount: number; ipCount: number };
+export const emptyPair = (): Pair => ({ validated: 0, inPlay: 0, vCount: 0, ipCount: 0 });
+export function addToPair(p: Pair, status: string, acv: number | null) {
+  if (status === "validated") { p.validated += Number(acv ?? 0); p.vCount++; }
+  if (status === "in_play") { p.inPlay += Number(acv ?? 0); p.ipCount++; }
+  return p;
+}

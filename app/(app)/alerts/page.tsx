@@ -6,7 +6,7 @@ import { markAllRead } from "./actions";
 
 export const metadata: Metadata = { title: "Alerts" };
 
-const KIND_LABEL: Record<string, string> = { dashboard: "Dashboard updated", results: "Results out", news: "News" };
+const KIND_LABEL: Record<string, string> = { dashboard: "Dashboard updated", results: "Results out", news: "News", whitespace: "Whitespace" };
 
 function when(iso: string) {
   return new Date(iso).toLocaleString("en-US", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });

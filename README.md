@@ -71,7 +71,7 @@ npm run typecheck
 npm run build
 ```
 
-## Whitespace (part 1)
+## Whitespace
 
 Sellers record, for each bank and Curinos product, what the account team knows: **Validated whitespace** (with the quarter to pursue and ACV), **In play** (ACV, expected close), **Recently lost: pipeline** (lost within 12 months), **Recently lost: renewal** (within 24 months), **Current client** or **Not a fit**. No status means not reviewed. Statuses are shared by everyone on the account (table `whitespace`, one row per bank x product); every change is logged by trigger in `whitespace_events` for history. Lost deals turn back into whitespace when their window passes.
 
@@ -79,4 +79,8 @@ Sellers record, for each bank and Curinos product, what the account team knows: 
 - **Whitespace** (top menu): the seller's book (followed banks) as headline numbers and a bank x product grid, editable cell by cell.
 - Products that don't apply (wrong country, banks-only for a credit union, hard size gates) are greyed out, from the catalogue's own rules (`lib/whitespace.ts`).
 - Demo rows are flagged `is_demo`; Admin → Whitespace → **Clear demo data** removes them and their history.
+- **Whitespace page** also has the dashboard: opportunity by target quarter (validated and in play stacked), opportunity over time (weekly), by bank, by product pillar, status mix, next steps (pursuits due or overdue, research-backed products not yet reviewed, losses about to expire, stale in-play deals) and recent changes.
+- **Weekly snapshots** (`whitespace_snapshots`, pg_cron `whitespace-weekly`, Mondays 06:17 UTC) keep a copy of every status for trend analysis; the same job raises an in-app alert when a lost deal passes its window. `whitespace_state_at(ts)` rebuilds the state at any moment from the history.
+- **Home** shows a "Your whitespace" card; **product pages** show the product's status across your book and the team's pursuits; the **Ask** assistant reads it all through `get_whitespace`.
+- ACV accepts `250k`, `1.2m` or a bare number under 1,000, read as thousands.
 

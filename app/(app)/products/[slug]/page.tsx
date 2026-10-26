@@ -7,6 +7,8 @@ import { formatAssets } from "@/lib/institutions";
 import { inScope, parseScope, type InsightInput } from "@/lib/insights";
 import { CATALOGUE_SOURCE, boldParts, effectivePriority, productBySlug, productFor, sellerBlocks, statusLabel } from "@/lib/products";
 import { createClient } from "@/lib/supabase/server";
+import { STATUS_KEYS, WHITESPACE_COLUMNS, formatQuarter, formatUsd, lostExpired, type WhitespaceRow } from "@/lib/whitespace";
+import { StatusPill } from "../../whitespace/editor";
 import { AskDrawer } from "../../ask/ask-chat";
 import { ScopeTabs } from "../../scope-tabs";
 
@@ -49,6 +51,13 @@ export default async function ProductPage({ params, searchParams }: Props) {
       if (o.q && o.a && !objections.has(o.q.toLowerCase())) objections.set(o.q.toLowerCase(), { q: o.q, a: o.a, slug: r.slug, name: r.name });
     }
   }
+  // Whitespace for this product: across the seller's book, and across the team.
+  const { data: wsData } = await supabase.from("whitespace").select(WHITESPACE_COLUMNS).eq("product_slug", product.slug);
+  const ws = ((wsData ?? []) as WhitespaceRow[]).filter((w) => !lostExpired(w));
+  const names = new Map((data ?? []).map((r) => [r.slug as string, r.name as string]));
+  const inBook = ws.filter((w) => followed.has(w.slug)).sort((a, b) => STATUS_KEYS.indexOf(a.status) - STATUS_KEYS.indexOf(b.status));
+  const teamPursuits = ws.filter((w) => w.status === "validated" || w.status === "in_play");
+  const teamAcv = teamPursuits.reduce((sum, w) => sum + Number(w.acv_usd ?? 0), 0);
   const status = statusLabel(product);
   const blocks = sellerBlocks(product.body);
 
@@ -70,6 +79,27 @@ export default async function ProductPage({ params, searchParams }: Props) {
       )}
       {product.status === "unlisted" && (
         <div className="notice error">No longer listed on curinos.com. Confirm availability with Product Marketing before proposing it.</div>
+      )}
+      {(inBook.length > 0 || teamPursuits.length > 0) && (
+        <section className="panel ws-product-panel">
+          <div className="panel-head">
+            <h2>Whitespace</h2>
+            <span className="dim">
+              Across the team: {teamPursuits.length} {teamPursuits.length === 1 ? "pursuit" : "pursuits"}{teamAcv ? `, ${formatUsd(teamAcv)} ACV` : ""}
+            </span>
+          </div>
+          {inBook.length === 0 ? <p className="dim">Not set at any bank you follow yet.</p> : (
+            <ul className="ws-product-list">
+              {inBook.map((w) => (
+                <li key={w.slug}>
+                  <Link href={`/banks/${w.slug}/whitespace`}>{names.get(w.slug) ?? w.slug}</Link>
+                  <StatusPill status={w.status} />
+                  <span className="dim">{[w.target_quarter && formatQuarter(w.target_quarter), w.acv_usd != null && formatUsd(w.acv_usd)].filter(Boolean).join(" · ")}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       )}
       <ScopeTabs path={`/products/${product.slug}`} scope={scope} />
 

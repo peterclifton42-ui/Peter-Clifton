@@ -9,6 +9,10 @@ import {
 import { compareDashboards } from "../changes";
 import { METRICS } from "../metrics";
 import { PRODUCTS, effectivePriority, productBySlug, productFor, sellerBlocks, statusLabel } from "../products";
+import {
+  EVENT_COLUMNS as WS_EVENT_COLUMNS, STATUSES, WHITESPACE_COLUMNS, bookOf, describeChange, formatQuarter, lostExpired,
+  type WhitespaceEvent, type WhitespaceRow,
+} from "../whitespace";
 
 // The assistant's tools: read-only lookups into the app's own data, run with the
 // signed-in seller's Supabase client, so row-level security applies to every call.
@@ -173,6 +177,19 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: "get_whitespace",
+    description: "The account teams' whitespace: for each institution and product, a shared status set by sellers - validated whitespace (target quarter, ACV in USD), in play (pipeline, ACV), recently lost pipeline (within 12 months) or renewal (within 24 months, avoid for now), current client, or not a fit; anything else is not reviewed. With no arguments: the user's book (the banks they follow) with totals, by-quarter and by-bank rollups, next steps and changes in the last 30 days. Narrow with slug (one institution) or product (one product across the book, or across all banks with all_banks).",
+    input_schema: {
+      type: "object",
+      properties: {
+        slug: { type: "string", description: "One institution's slug." },
+        product: { type: "string", description: "Product slug or name." },
+        all_banks: { type: "boolean", description: "Include every institution, not only the user's book." },
+      },
+      additionalProperties: false,
+    },
+  },
 ];
 
 type Ctx = { db: SupabaseClient; userId: string };
@@ -201,6 +218,7 @@ const TOOL_LABELS: Record<string, (input: Record<string, unknown>) => string> = 
   get_dashboard_history: (i) => `Reading the version history of ${i.slug}`,
   get_market_insights: (i) => (i.theme ? `Reading the evidence for “${i.theme}”` : "Reading market insights"),
   get_product: (i) => `Looking up ${i.product}`,
+  get_whitespace: (i) => (i.slug ? `Checking whitespace at ${i.slug}` : i.product ? `Checking whitespace for ${i.product}` : "Checking your whitespace"),
 };
 
 export function toolLabel(name: string, input: unknown) {
@@ -360,6 +378,45 @@ export async function runTool(name: string, rawInput: unknown, ctx: Ctx): Promis
         priority_3: entries.filter((e) => e.priority === 3).map((e) => e.name),
         ruled_out: rows.flatMap((r) => (r.dnr_products ?? []).filter((d) => productFor(d.name)?.slug === product.slug).map((d) => ({ name: r.name, reason: d.reason }))),
         objections: entries.flatMap((e) => (e.objections ?? []).map((o) => ({ ...o, institution: e.name }))).slice(0, 12),
+      });
+    }
+
+    case "get_whitespace": {
+      const slug = str(input.slug);
+      const productKey = str(input.product);
+      const product = productKey ? productBySlug(productKey) ?? productFor(productKey) ?? PRODUCTS.find((p) => p.name.toLowerCase().includes(productKey.toLowerCase())) : null;
+      if (productKey && !product) return `Unknown product "${productKey}".`;
+      const follows = await followed(ctx);
+      const scope = slug ? [slug] : bool(input.all_banks) ? null : [...follows];
+      if (scope && scope.length === 0) return "The user follows no banks, so their book is empty. Suggest following banks (the star on Banks) and setting statuses on the Whitespace page.";
+      let q = ctx.db.from("whitespace").select(WHITESPACE_COLUMNS);
+      let iq = ctx.db.from("institutions").select("slug, name, category, assets_b");
+      let rq = ctx.db.from("insight_inputs").select("slug, products, dnr_products");
+      let eq = ctx.db.from("whitespace_events").select(WS_EVENT_COLUMNS).gte("at", new Date(Date.now() - 30 * 86400 * 1000).toISOString()).order("at", { ascending: false }).limit(60);
+      if (scope) { q = q.in("slug", scope); iq = iq.in("slug", scope); rq = rq.in("slug", scope); eq = eq.in("slug", scope); }
+      if (product) { q = q.eq("product_slug", product.slug); eq = eq.eq("product_slug", product.slug); }
+      const [{ data: rows }, { data: insts }, { data: research }, { data: events }] = await Promise.all([q, iq, rq, eq]);
+      const names = new Map((insts ?? []).map((i) => [i.slug as string, i.name as string]));
+      const pname = (p: string) => productBySlug(p)?.name ?? p;
+      const list = ((rows ?? []) as WhitespaceRow[]).map((r) => ({
+        institution: names.get(r.slug) ?? r.slug, page: `/banks/${r.slug}/whitespace`, product: pname(r.product_slug),
+        status: lostExpired(r) ? "eligible again (loss window passed)" : STATUSES[r.status].label,
+        quarter: r.target_quarter ? formatQuarter(r.target_quarter) : undefined, acv_usd: r.acv_usd ?? undefined,
+        lost: r.lost_on ?? undefined, note: r.note ?? undefined, updated: r.updated_at.slice(0, 10), demo: r.is_demo || undefined,
+      }));
+      const book = slug || product ? null : bookOf({ institutions: (insts ?? []) as never, research: (research ?? []) as never, rows: (rows ?? []) as WhitespaceRow[] });
+      return clip({
+        scope: slug ? names.get(slug) ?? slug : bool(input.all_banks) ? "all institutions" : "the user's book (followed banks)",
+        note: "Statuses are shared by the account team; ACV is annual contract value in USD. Rows marked demo are sample data.",
+        ...(book && {
+          totals: { validated_acv: book.totals.validated.acv, validated: book.totals.validated.count, in_play_acv: book.totals.inPlay.acv, in_play: book.totals.inPlay.count, recently_lost: book.totals.lost, due_by_this_quarter: book.totals.dueThisQuarter, reviewed: `${book.reviewed} of ${book.applicable} applicable` },
+          by_quarter: book.byQuarter.map((x) => ({ quarter: x.label, validated_acv: x.pair.validated, in_play_acv: x.pair.inPlay })),
+          by_bank: book.byBank.map((x) => ({ institution: x.name, validated_acv: x.pair.validated, in_play_acv: x.pair.inPlay })),
+          next_steps: book.steps.map((x) => x.text),
+          not_reviewed_but_research_backed: book.banks.map((i) => ({ institution: i.name, products: book.lines.get(i.slug)!.filter((l) => l.applies.ok && !l.row && l.priority != null && l.priority <= 2).map((l) => `${l.product.name} (P${l.priority})`) })).filter((x) => x.products.length),
+        }),
+        statuses: list,
+        changes_last_30_days: ((events ?? []) as WhitespaceEvent[]).map((e) => ({ when: e.at.slice(0, 10), institution: names.get(e.slug) ?? e.slug, product: pname(e.product_slug), change: describeChange(e) })),
       });
     }
 

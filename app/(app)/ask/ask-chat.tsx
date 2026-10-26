@@ -12,14 +12,14 @@ const STARTERS: Record<string, string[]> = {
   market: [
     "Which of my banks are most likely to need deposit pricing help this quarter, and why?",
     "Who reports results in the next two weeks, and what should I watch for?",
-    "Which banks have low data maturity but are investing in technology?",
+    "Summarise my whitespace: where's the biggest opportunity, and what should I pursue next quarter?",
     "What are the most common objections to Pricing Data, and how do I answer them?",
   ],
   bank: [
     "Give me a one-minute brief before my call.",
     "What's changed since their last results, and what's the best opening?",
     "Who should I talk to, and what does each of them care about?",
-    "How do they compare with their closest peers on deposit cost and margin?",
+    "Which products should we pursue here next, given the research and our whitespace?",
   ],
   product: [
     "Which three banks should I call first for this, and what do I say?",
