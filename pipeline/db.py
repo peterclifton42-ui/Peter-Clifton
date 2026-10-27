@@ -17,6 +17,11 @@ bypasses row-level security, so it lives only there and in Vercel.
     python3 pipeline/db.py news-targets [n]          # most-followed institutions (default 15)
     python3 pipeline/db.py add-news <slug> <YYYY-MM-DD> "<headline>" "<summary>" "<source name>" <url> --tag <earnings|strategy|digital|partnership|risk> --angle "<sales angle>"
 
+    python3 pipeline/db.py new-queue                 # requested new institutions, oldest first
+    python3 pipeline/db.py new-start <request id>    # claim one for this run
+    python3 pipeline/db.py new-live <request id> <slug>        # after publishing: link it, add to books, alert
+    python3 pipeline/db.py new-failed <request id> "<reason>"  # couldn't build: record why, alert
+    python3 pipeline/db.py set-regulatory-id <slug> <fdic|ncua> <id>   # FDIC cert (holding company's lead bank) or NCUA charter
 Every command prints JSON.
 """
 import argparse
@@ -99,6 +104,11 @@ def main():
         p.add_argument(name)
     p.add_argument("--tag", choices=["earnings", "strategy", "digital", "partnership", "risk"], default="strategy")
     p.add_argument("--angle", help="one sentence on how a seller could use it")
+    sub.add_parser("new-queue")
+    p = sub.add_parser("new-start"); p.add_argument("id", type=int)
+    p = sub.add_parser("new-live"); p.add_argument("id", type=int); p.add_argument("slug")
+    p = sub.add_parser("new-failed"); p.add_argument("id", type=int); p.add_argument("reason")
+    p = sub.add_parser("set-regulatory-id"); p.add_argument("slug"); p.add_argument("source", choices=["fdic", "ncua"]); p.add_argument("id")
     a = ap.parse_args()
 
     if a.cmd == "check":
@@ -165,6 +175,20 @@ def main():
             "source_name": a.source_name, "url": a.url, "tag": a.tag, "sales_angle": (a.angle or "").strip() or None,
         }, params={"on_conflict": "slug,headline"}, prefer="resolution=ignore-duplicates,return=representation")
         out({"added": bool(row)})
+    elif a.cmd == "new-queue":
+        out(rpc("pipeline_new_institution_queue"))
+    elif a.cmd == "new-start":
+        rpc("pipeline_new_institution_start", {"p_id": a.id})
+        out({"claimed": a.id})
+    elif a.cmd == "new-live":
+        out({"live": a.slug, "people_told": rpc("pipeline_new_institution_live", {"p_id": a.id, "p_slug": a.slug})})
+    elif a.cmd == "new-failed":
+        rpc("pipeline_new_institution_failed", {"p_id": a.id, "p_reason": a.reason})
+        out({"failed": a.id})
+    elif a.cmd == "set-regulatory-id":
+        request("POST", "regulatory_ids", {"slug": a.slug, "source": a.source, "id": a.id},
+                params={"on_conflict": "slug"}, prefer="resolution=merge-duplicates")
+        out({"slug": a.slug, a.source: a.id})
 
 
 if __name__ == "__main__":

@@ -20,6 +20,14 @@ Repository: `/home/user/Peter-Clifton` (if it is missing, `git clone https://git
 
 ## Step 1 — Pick the institution
 
+**New institutions come first.** Sellers can request a dashboard for a bank or credit union the app doesn't cover yet (Banks → "Request a new bank or credit union"). Build at most one per run, before any routine refresh:
+
+```bash
+python3 pipeline/db.py new-queue
+```
+
+If it returns a request, follow **"Building a new institution"** at the end of this file instead of the rest of Step 1, then carry on from Step 2 as usual. If it is empty, continue here with the routine queue:
+
 ```bash
 python3 pipeline/db.py queue
 ```
@@ -134,3 +142,27 @@ python3 pipeline/db.py finish <RUN ID> failed "<step>: <exact error>"
 ```
 
 End with a final message that names the institution, the step and the exact error; the owner is emailed your final message. The next run will pick the same institution again, because it is still at the top of the queue.
+
+## Building a new institution
+
+Take the **first** request from `new-queue` (fields: `id`, `name`, `website`, `kind`, `note`). Keep its `id` as the REQUEST ID.
+
+1. **Claim it:** `python3 pipeline/db.py new-start <REQUEST ID>`, then `python3 pipeline/db.py start refresh "New institution: <name>"` (no slug yet: it doesn't exist in the app). Keep the printed `run_id` as the RUN ID.
+2. **Identify it (1–3 web calls, counted in the 40).** Use the name, website and kind to find the exact legal entity: for a bank, the holding company and its lead bank on FDIC BankFind (certificate number); for a credit union, its NCUA charter number. It must be a US bank, thrift or credit union that is still operating.
+   - Not found, ambiguous, not a US deposit-taker, or already covered under another name (check `python3 pipeline/db.py institution <likely-slug>` and the names in `pipeline/covered-institutions.md`): run `python3 pipeline/db.py new-failed <REQUEST ID> "<plain reason a seller can act on, e.g. 'Couldn't find a US bank called X: add its website and request again'>"`, then `python3 pipeline/db.py finish <RUN ID> skipped "New institution: <reason>"`, and stop.
+3. **Choose its slug:** the institution's name in lower case, words joined by hyphens, punctuation and "Inc." dropped (for example `cullen-frost-bankers`, `becu`). It must not already exist. Set `meta.slug` to it.
+4. **Research and check it exactly as Steps 2–6 describe**, with the latest reported quarter as the period. There is no earlier dashboard; everything is sourced fresh. The registry lookup in Step 3 is the one you just did.
+5. **Publish** (Step 7). `publish.py` creates the institution in the app.
+6. **Wire it in:**
+   ```bash
+   python3 pipeline/db.py set-regulatory-id <slug> <fdic|ncua> <certificate or charter number>
+   python3 pipeline/regulatory.py --only <slug>
+   python3 pipeline/db.py set-event <slug> "<latest period>" --date <its results date> --status reported --kind earnings --source <release URL>
+   python3 pipeline/db.py set-event <slug> "<next period>" --date <expected date> --status estimated --kind earnings --note "Estimated from last year's timing"
+   python3 pipeline/db.py new-live <REQUEST ID> <slug>
+   ```
+   Credit unions without public results releases: use `--kind call_report_ncua` and the NCUA filing date for the reported row, and skip the estimated row if there is no pattern. `new-live` adds the dashboard to the requesters' books and alerts them.
+7. **Close the run:** `python3 pipeline/db.py finish <RUN ID> published "New institution <slug>: completeness n/15, <calls> calls, <peers> peers"`.
+
+**If the build fails after the claim** (a gate fails, publish errors): never publish a partial build. Run `python3 pipeline/db.py new-failed <REQUEST ID> "<step>: <short reason>"` and `python3 pipeline/db.py finish <RUN ID> failed "<step>: <exact error>"`. A seller can retry it from the app; after 3 attempts it stops being picked up.
+

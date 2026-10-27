@@ -3,6 +3,7 @@
 
     python3 pipeline/regulatory.py            # needs SUPABASE_SECRET_KEY
     python3 pipeline/regulatory.py --dry-run  # print, don't write
+    python3 pipeline/regulatory.py --only <slug>   # one institution (after adding it)
 
 Banks: the FDIC BankFind API (call reports). A holding company's figures are the
 sum of every active bank charter it owns, so Wintrust's 16 charters count as one.
@@ -14,7 +15,8 @@ income over total assets, as NCUA reports it; deposit cost is dividends plus
 interest on deposits over shares and deposits.
 
 Income figures are year to date in both filings and are annualised. Which
-institution is which filing lives in pipeline/regulatory-ids.csv.
+institution is which filing lives in pipeline/regulatory-ids.csv, plus the
+regulatory_ids table for institutions added since (db.py set-regulatory-id).
 """
 import argparse
 import csv
@@ -198,15 +200,27 @@ def load_credit_unions(ids, quarters):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--only", help="load one institution")
     args = ap.parse_args()
     ids = {"fdic": {}, "ncua": {}}
     for r in csv.DictReader(open(os.path.join(HERE, "regulatory-ids.csv"))):
         ids[r["source"]][r["slug"]] = r["id"]
+    if os.environ.get("SUPABASE_SECRET_KEY"):
+        sys.path.insert(0, HERE)
+        import db
+        for r in db.request("GET", "regulatory_ids", params={"select": "slug,source,id"}) or []:
+            for source in ids:
+                ids[source].pop(r["slug"], None)
+            ids[r["source"]][r["slug"]] = r["id"]
+    if args.only:
+        ids = {source: {s: v for s, v in m.items() if s == args.only} for source, m in ids.items()}
+        if not any(ids.values()):
+            sys.exit(f"No registry id for {args.only}: add it with db.py set-regulatory-id first.")
 
     quarters = quarter_ends(QUARTERS)
     start = period(*quarters[-1])
-    bank_m, bank_e = load_banks(ids["fdic"], start)
-    cu_m, cu_e = load_credit_unions(ids["ncua"], quarters)
+    bank_m, bank_e = load_banks(ids["fdic"], start) if ids["fdic"] else ([], [])
+    cu_m, cu_e = load_credit_unions(ids["ncua"], quarters) if ids["ncua"] else ([], [])
     metrics, entities = bank_m + cu_m, bank_e + cu_e
     latest = {}
     for r in metrics:

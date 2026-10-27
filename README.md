@@ -93,3 +93,9 @@ Sellers record, for each bank and Curinos product, what the account team knows: 
 - Home shows managers a "Your team" line; product pages show "Your team" pursuits; Ask's `get_whitespace` takes `team` and `seller`.
 - **Demo sellers** (`profiles.is_demo`): three sellers with regional books and back-dated history on the owner's team; they can't sign in, get no email, and Admin → Whitespace → Clear demo data removes them with the rest of the demo data.
 
+## Requesting a new institution
+
+- **Banks → "+ Request a new bank or credit union"** (`/banks/request`): name, bank or credit union, optional website/ticker and note, and "add it to my book when it's ready". Names are matched against what's covered ("Frost" finds Cullen/Frost) and against open requests (a second request joins the first). No approval: requests go straight into the queue (`institution_requests`, `institution_request_followers`).
+- **Building:** the scheduled refresh job takes the oldest request **before** routine refreshes, at most one per run (`db.py new-queue`, `new-start`), researches it with the same method and gates, publishes it (`publish.py` creates the institution), stores its FDIC/NCUA id (`db.py set-regulatory-id`, table `regulatory_ids`, read by `regulatory.py` alongside the CSV; `regulatory.py --only <slug>` loads one), adds its earnings dates, then `db.py new-live` adds it to the requesters' books and alerts them (in-app and email). A failure (`db.py new-failed`) alerts them with the reason; they can retry from the page (up to 3 attempts per try).
+- The request page lists every request with its status (in the queue with position, building, live, couldn't build, cancelled); requesters and admins can cancel or retry.
+

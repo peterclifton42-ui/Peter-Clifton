@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { requireViewer } from "@/lib/auth";
 import { EVENT_COLUMNS, latestAndNext, todayISO, type EarningsEvent } from "@/lib/earnings";
 import { followedSlugs } from "@/lib/follows";
@@ -11,10 +12,11 @@ export const metadata: Metadata = { title: "Banks" };
 export default async function DirectoryPage() {
   const viewer = await requireViewer();
   const supabase = await createClient();
-  const [{ data, error }, { data: events }, followed] = await Promise.all([
+  const [{ data, error }, { data: events }, followed, { count: queued }] = await Promise.all([
     supabase.from("institutions").select(INSTITUTION_COLUMNS).order("assets_b", { ascending: false }),
     supabase.from("earnings_events").select(EVENT_COLUMNS),
     followedSlugs(viewer.id),
+    supabase.from("institution_requests").select("id", { count: "exact", head: true }).in("status", ["queued", "building"]),
   ]);
 
   const today = todayISO();
@@ -32,6 +34,10 @@ export default async function DirectoryPage() {
         <div>
           <h1>Banks and credit unions</h1>
           <p>Search or filter, then open an institution to see its full dashboard. Tap ☆ to follow it.</p>
+        </div>
+        <div className="head-actions">
+          <Link href="/banks/request" className="button secondary head-link">+ Request a new bank or credit union</Link>
+          {(queued ?? 0) > 0 && <Link href="/banks/request" className="dim">{queued} in the queue</Link>}
         </div>
       </div>
       {error ? (
