@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { setAssignment } from "../../assign";
 import { requestRefresh } from "./actions";
 
 type NewsState = { busy: boolean; message?: string; error?: boolean };
@@ -96,5 +97,39 @@ export function RefreshMenu({ slug, requested }: { slug: string; requested: { by
         </div>
       </details>
     </span>
+  );
+}
+
+// Managers: put this bank in team members' books (or take it out).
+export function AssignMenu({ slug, members }: { slug: string; members: { id: string; name: string; owns: boolean }[] }) {
+  const [owns, setOwns] = useState(() => new Set(members.filter((m) => m.owns).map((m) => m.id)));
+  const [error, setError] = useState<string | null>(null);
+  const [, start] = useTransition();
+  function toggle(id: string) {
+    const assign = !owns.has(id);
+    const next = new Set(owns);
+    if (assign) next.add(id); else next.delete(id);
+    setOwns(next);
+    setError(null);
+    start(async () => {
+      const res = await setAssignment(slug, id, assign);
+      if (res.error) { setOwns(owns); setError(res.error); }
+    });
+  }
+  return (
+    <details className="menu">
+      <summary className="tool-btn">Assign{owns.size ? ` (${owns.size})` : ""}</summary>
+      <div className="menu-list assign-list" role="menu">
+        <div className="menu-note"><b>In whose book?</b><span>Ticking adds it to their accounts and lets them know.</span></div>
+        {members.map((m) => (
+          <label key={m.id} className="toggle">
+            <input type="checkbox" checked={owns.has(m.id)} onChange={() => toggle(m.id)} />
+            {m.name}
+          </label>
+        ))}
+        {members.length === 1 && <div className="menu-note"><span>Add sellers to your team under Whitespace → Team → Manage team.</span></div>}
+        {error && <div className="menu-note"><span className="bad">{error}</span></div>}
+      </div>
+    </details>
   );
 }

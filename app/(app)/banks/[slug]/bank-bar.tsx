@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { cache } from "react";
-import { requireViewer } from "@/lib/auth";
+import { canManage, requireViewer } from "@/lib/auth";
 import { EVENT_COLUMNS, formatDay, latestAndNext, needsRefresh, todayISO, type EarningsEvent } from "@/lib/earnings";
 import { categoryLabel, formatAssets, shortQuarter, INSTITUTION_COLUMNS, type Institution } from "@/lib/institutions";
 import { peerSuggestions } from "@/lib/peers";
+import { memberNames } from "@/lib/people";
+import { loadTeam } from "@/lib/team";
 import { createClient } from "@/lib/supabase/server";
 import { AskDrawer } from "../../ask/ask-chat";
 import { AccountToggle, FollowButton } from "../../follow-button";
-import { RefreshMenu } from "./bank-actions";
+import { AssignMenu, RefreshMenu } from "./bank-actions";
 
 export type BankInstitution = Institution & { current_snapshot_id: number | null };
 
@@ -30,13 +32,18 @@ export async function BankBar({ institution, researchedAt, view }: {
   const today = todayISO();
   const [{ data: events }, { data: fav }, { count: versions }, peerMap, { count: newsTotal }, { data: requests }] = await Promise.all([
     supabase.from("earnings_events").select(EVENT_COLUMNS).eq("slug", slug),
-    supabase.from("favourites").select("my_account").eq("user_id", viewer.id).eq("slug", slug).maybeSingle(),
+    supabase.from("favourites").select("my_account, assigned_by").eq("user_id", viewer.id).eq("slug", slug).maybeSingle(),
     supabase.from("snapshots").select("id", { count: "exact", head: true }).eq("slug", slug),
     peerSuggestions(supabase),
     supabase.from("news_items").select("id", { count: "exact", head: true }).eq("slug", slug),
     supabase.from("refresh_requests").select("requested_by, requested_at").eq("slug", slug).is("fulfilled_at", null)
       .order("requested_at").limit(1),
   ]);
+  const [team, names] = await Promise.all([
+    canManage(viewer) ? loadTeam(viewer.id) : Promise.resolve(null),
+    fav?.assigned_by && fav.assigned_by !== viewer.id ? memberNames() : Promise.resolve(null),
+  ]);
+  const assignedBy = fav?.my_account && names ? names.get(fav.assigned_by as string)?.split(" ")[0] : null;
   const request = requests?.[0] ? { byYou: requests[0].requested_by === viewer.id, at: requests[0].requested_at as string } : null;
   const { latest, next } = latestAndNext((events ?? []) as EarningsEvent[], today).get(slug) ?? {};
   const outOfDate = latest && needsRefresh(latest, researchedAt);
@@ -67,6 +74,8 @@ export async function BankBar({ institution, researchedAt, view }: {
         <RefreshMenu slug={slug} requested={request} />
         <FollowButton slug={slug} name={institution.name} following={Boolean(fav)} />
         {fav && <AccountToggle slug={slug} mine={fav.my_account} />}
+        {assignedBy && <span className="assigned-by">Assigned by {assignedBy}</span>}
+        {team && <AssignMenu slug={slug} members={team.map((m) => ({ id: m.id, name: m.name, owns: m.banks.includes(slug) }))} />}
         <AskDrawer context={{ kind: "bank", slug, name: institution.name }} />
       </span>
     </div>

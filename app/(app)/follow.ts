@@ -19,6 +19,8 @@ export async function setFollowing(slug: string, follow: boolean) {
 export async function setMyAccount(slug: string, mine: boolean) {
   const viewer = await requireViewer();
   const supabase = await createClient();
-  await supabase.from("favourites").update({ my_account: mine }).eq("user_id", viewer.id).eq("slug", slug);
+  // Taking an assigned account out of your book also drops the "assigned by" label.
+  await supabase.from("favourites").update(mine ? { my_account: true } : { my_account: false, assigned_by: null, assigned_at: null })
+    .eq("user_id", viewer.id).eq("slug", slug);
   revalidatePath("/", "layout");
 }
