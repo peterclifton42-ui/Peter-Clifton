@@ -3,7 +3,7 @@ import { cache } from "react";
 import { requireViewer } from "@/lib/auth";
 import { EVENT_COLUMNS, formatDay, latestAndNext, needsRefresh, todayISO, type EarningsEvent } from "@/lib/earnings";
 import { categoryLabel, formatAssets, shortQuarter, INSTITUTION_COLUMNS, type Institution } from "@/lib/institutions";
-import { suggestPeers } from "@/lib/metrics";
+import { peerSuggestions } from "@/lib/peers";
 import { createClient } from "@/lib/supabase/server";
 import { AskDrawer } from "../../ask/ask-chat";
 import { AccountToggle, FollowButton } from "../../follow-button";
@@ -28,11 +28,11 @@ export async function BankBar({ institution, researchedAt, view }: {
   const viewer = await requireViewer();
   const supabase = await createClient();
   const today = todayISO();
-  const [{ data: events }, { data: fav }, { count: versions }, { data: all }, { count: newsTotal }, { data: requests }] = await Promise.all([
+  const [{ data: events }, { data: fav }, { count: versions }, peerMap, { count: newsTotal }, { data: requests }] = await Promise.all([
     supabase.from("earnings_events").select(EVENT_COLUMNS).eq("slug", slug),
     supabase.from("favourites").select("my_account").eq("user_id", viewer.id).eq("slug", slug).maybeSingle(),
     supabase.from("snapshots").select("id", { count: "exact", head: true }).eq("slug", slug),
-    supabase.from("institutions").select("slug, category, assets_b"),
+    peerSuggestions(supabase),
     supabase.from("news_items").select("id", { count: "exact", head: true }).eq("slug", slug),
     supabase.from("refresh_requests").select("requested_by, requested_at").eq("slug", slug).is("fulfilled_at", null)
       .order("requested_at").limit(1),
@@ -62,7 +62,7 @@ export async function BankBar({ institution, researchedAt, view }: {
       ) : null}
       <span className="bank-tools">
         {(versions ?? 0) > 1 && <Link href={`/banks/${slug}/changes`}>What changed</Link>}
-        <Link href={`/compare?ids=${[slug, ...suggestPeers(slug, all ?? [])].join(",")}`}>Compare peers</Link>
+        <Link href={`/compare?ids=${[slug, ...(peerMap[slug]?.suggestions ?? []).map((p) => p.slug)].join(",")}&a=${slug}`}>Compare peers</Link>
         {(newsTotal ?? 0) > 0 && <Link href={`/banks/${slug}/news`}>News history ({newsTotal})</Link>}
         <RefreshMenu slug={slug} requested={request} />
         <FollowButton slug={slug} name={institution.name} following={Boolean(fav)} />
