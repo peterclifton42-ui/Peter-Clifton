@@ -65,7 +65,7 @@ The instructions in `lib/ask/agent.ts` require linked sources and enforce the ca
 
 ## Adding a seller
 
-Sign in as an admin, open **Admin**, enter their name and email and click **Send invite**. They get an email with a link (good for 7 days) to choose their own password, and land in the app. If the email can't be sent (for example before a sending domain is verified in Resend), Admin shows the link to copy and send yourself. Each person's row offers **Resend invite** until they first sign in, then **Send reset link**. The login page has **Forgot your password?**, which emails a 2-hour reset link. Links are one-time; only a hash of each is stored, in `account_links`.
+Sign in as an admin, open **Admin**, enter their name and email and click **Send invite**. They get an email with a link (good for 7 days) to choose their own password, and land in the app. Admin also shows the link to copy, so it can be sent another way if the email doesn't arrive (or can't be sent). Each person's row offers **Resend invite** until they first sign in, then **Send reset link**. The login page has **Forgot your password?**, which emails a 2-hour reset link. Links are one-time; only a hash of each is stored, in `account_links`.
 
 ## Working on the code
 
