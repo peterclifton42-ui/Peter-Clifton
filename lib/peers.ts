@@ -96,7 +96,8 @@ export async function peerSuggestions(db: SupabaseClient, n = 5): Promise<PeerMa
   for (const me of all) {
     const group = official.get(me.slug);
     const named = new Set(((group?.peers ?? []) as { slug: string | null }[]).map((p) => p.slug).filter(Boolean) as string[]);
-    const source = group ? `${group.year ? `${group.year} ` : ""}${group.source === "proxy" ? "proxy statement" : group.source === "10-k" ? "10-K" : "investor deck"}` : null;
+    // Only when the group names someone we cover (Truist's peers are all larger banks we don't).
+    const source = group && named.size ? `${group.year ? `${group.year} ` : ""}${group.source === "proxy" ? "proxy statement" : group.source === "10-k" ? "10-K" : "investor deck"}` : null;
     const ranked = all
       .filter((t) => t.slug !== me.slug && t.category === me.category && t.assets_b != null)
       .map((t) => {

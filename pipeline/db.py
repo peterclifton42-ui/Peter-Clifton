@@ -197,7 +197,7 @@ def main():
         if len(names) < 3:
             sys.exit("A peer group needs at least 3 names, separated by |")
         covered = request("GET", "institutions", params={"select": "slug,name"}) or []
-        peers = [{"name": n, "slug": next((c["slug"] for c in covered if c["slug"] != a.slug and same_institution(c["name"], n)), None)} for n in names]
+        peers = [{"name": n, "slug": next((c["slug"] for c in covered if c["slug"] != a.slug and peer_name(c["name"]) == peer_name(n)), None)} for n in names]
         request("POST", "peer_groups", {"slug": a.slug, "source": a.source, "source_url": a.url, "year": a.year, "peers": peers, "collected_at": now()},
                 params={"on_conflict": "slug"}, prefer="resolution=merge-duplicates")
         out({"slug": a.slug, "peers": len(peers), "covered": [p["slug"] for p in peers if p["slug"]]})
@@ -211,6 +211,19 @@ def normal_name(name):
     import re
     s = re.sub(SUFFIX, " ", name.lower().replace(".", "").replace("&", " and "))
     return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]+", " ", s)).strip()
+
+
+# Stricter than same_institution, for peer groups: only legal forms are dropped, so
+# "First Financial Bancorp" and "First Financial Bankshares" stay apart.
+LEGAL = r"\b(the|corporation|corp|incorporated|inc|company|co|na|n a|ltd)\b"
+
+
+def peer_name(name):
+    import re
+    s = name.lower().replace(".", "").replace("&", " and ").replace("/", " ")
+    s = re.sub(r"\(.*?\)", " ", s).replace("bancorporation", "bancorp").replace("bankcorp", "bancorp")
+    s = re.sub(LEGAL, " ", re.sub(r"[^a-z0-9 ]+", " ", s))
+    return re.sub(r"\s+", " ", s).strip()
 
 
 def same_institution(a, b):
