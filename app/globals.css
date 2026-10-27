@@ -723,3 +723,12 @@ table.team-table td:first-child { white-space: nowrap; }
 .request-note { grid-column: 1; margin: 0; font-size: 13px; }
 .request-actions { grid-column: 2; grid-row: 1 / span 3; display: flex; gap: 10px; align-items: center; }
 .page-head .head-link { white-space: nowrap; }
+.chip button.chip-peers { font-size: 11px; font-weight: 600; color: var(--accent-text); padding: 1px 6px; margin-left: 4px; border: 1px solid rgba(59, 130, 246, .35); border-radius: 10px; }
+.chip button.chip-peers:hover { background: rgba(59, 130, 246, .15); }
+.find-peers { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 13px; }
+.find-peers label { margin: 0; font-size: 13px; color: var(--text); font-weight: 600; }
+.find-peers select { width: auto; max-width: 320px; }
+.peer-why { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 13px; }
+.peer-why p { margin: 0 0 6px; }
+.peer-why ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.peer-why li .dot { margin-right: 6px; }

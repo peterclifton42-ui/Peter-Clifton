@@ -62,7 +62,7 @@ A web call is one WebSearch or one WebFetch. Count them as you go.
 |---|---|---|
 | Registry lookup | 1–2, mandatory | FDIC BankFind for the operating bank (or the NCUA charter for a credit union). Start with WebSearch: `site:fdic.gov bankfind "[legal name]"`, then fetch the details page. Fills `basic.fdic`, `structure.bank.fdic`, `structure.bank.rssd`, `basic.rssd`/`structure.parent.rssd`, `basic.employees` and `basic.est` |
 | Subject research | 20–24 | The source checklist below, in order. Move to peers by call 28 at the latest |
-| Peers | at least 8, reserved | 4 peers × (same-quarter release + one follow-up for a missing metric). Three fully sourced peers beat four half-empty ones |
+| Peers | at least 8, reserved | 4 peers × (same-quarter release + one follow-up for a missing metric). Three fully sourced peers beat four half-empty ones. **Choose them from the bank's own disclosed peer group first** (item 6), picking the closest in size and business model; only fill gaps with your own judgement, and say which you used in `peers.salesAngle` |
 | Completeness pass | up to 5 | Only on what `check_completeness.py` reports as FAIL |
 
 **Source checklist (subject):**
@@ -71,7 +71,8 @@ A web call is one WebSearch or one WebFetch. Count them as you go.
 3. The earnings call transcript: guidance, named analyst Q&A, quotes, deposit beta.
 4. The latest 10-Q: the NII rate-sensitivity table, liquidity (uninsured deposits, AOCI, borrowing capacity), the CD maturity schedule and segments.
 5. The latest 10-K: FTEs, branch count and states, segments, competition.
-6. The proxy or leadership page: at least 4 executives, with start years and backgrounds.
+6. The proxy or leadership page: at least 4 executives, with start years and backgrounds. **While in the proxy statement (DEF 14A), find its compensation peer group** (the list of banks the board benchmarks pay against; if there is none, the 10-K's performance-graph peer index). Record it straight away, names exactly as listed:
+   `python3 pipeline/db.py set-peer-group <slug> proxy <DEF 14A URL> <proxy year> "<Peer A> | <Peer B> | ..."` (use `10-k` and the 10-K URL for a performance-graph index). Skip for credit unions and private banks, which don't publish one; if the group was collected in the last 12 months (`peer_groups`), don't spend a call on it.
 7. The investor presentation: strategy pillars, targets, digital metrics.
 8. Analyst ratings: at least 3 firms, each with a rating and a price target.
 9. Technology and vendors: at least 3 `techPlatforms[]` entries, each with a URL.

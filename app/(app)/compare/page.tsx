@@ -7,6 +7,7 @@ import {
   type MetricKey, type MetricRow,
 } from "@/lib/metrics";
 import { createClient } from "@/lib/supabase/server";
+import { peerSuggestions } from "@/lib/peers";
 import { Picker, type Option } from "./picker";
 import { TrendChart } from "./trend-chart";
 
@@ -14,12 +15,14 @@ export const metadata: Metadata = { title: "Compare" };
 
 type Entity = { slug: string; source: string; ids: string[]; names: string[]; holding_company: string | null };
 
-export default async function ComparePage({ searchParams }: { searchParams: Promise<{ ids?: string; c?: string; m?: string }> }) {
+export default async function ComparePage({ searchParams }: { searchParams: Promise<{ ids?: string; c?: string; m?: string; a?: string }> }) {
   const viewer = await requireViewer();
   const params = await searchParams;
   const supabase = await createClient();
   const { data: list } = await supabase.from("institutions").select("slug, name, category, assets_b").order("name");
   const options = (list ?? []) as Option[];
+  const peerMap = await peerSuggestions(supabase, MAX_COMPARE - 1);
+  const peers = Object.fromEntries(Object.entries(peerMap).map(([slug, p]) => [slug, p.suggestions.map((x) => x.slug)]));
   const known = new Set(options.map((o) => o.slug));
 
   let ids = (params.ids ?? "").split(",").filter((s) => known.has(s));
@@ -54,6 +57,9 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   slots.forEach((s, i) => { if (!s) slots[i] = [1, 2, 3, 4, 5, 6].find((n) => !slots.includes(n))!; });
   const color = new Map(ids.map((slug, i) => [slug, slots[i]]));
   const mixed = new Set(ids.map((s) => byName.get(s)?.category)).size > 1;
+  // When the comparison is an institution plus suggested peers, say why each was picked.
+  const anchor = params.a && ids[0] === params.a ? params.a : null;
+  const why = anchor ? peerMap[anchor]?.suggestions.filter((p) => ids.includes(p.slug)) ?? [] : [];
 
   return (
     <main className="page">
@@ -68,7 +74,19 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
       </div>
 
       <div className="panel">
-        <Picker options={options} selected={ids} slots={slots} metrics={metrics} />
+        <Picker options={options} selected={ids} slots={slots} metrics={metrics} peers={peers} anchor={anchor} />
+        {anchor && why.length > 0 && (
+          <div className="peer-why">
+            <p><b>Why these peers for {byName.get(anchor)?.name}</b>
+              {peerMap[anchor]?.officialSource ? <> · its own disclosed peer group (its {peerMap[anchor].officialSource}) comes first, then the closest matches</> : <> · closest on size (40%), region (20%), and business model and balance sheet (40%)</>}
+            </p>
+            <ul>
+              {why.map((p) => (
+                <li key={p.slug}><i className={`dot s${color.get(p.slug)}`} /><b>{byName.get(p.slug)?.name}</b> <span className="dim">{p.reasons.join(" · ")}</span></li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       {ids.length === 0 ? (

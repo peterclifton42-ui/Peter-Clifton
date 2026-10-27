@@ -91,13 +91,3 @@ export function median(values: number[]) {
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
-// Nearest institutions by size within the same category: a sensible starting peer set.
-export function suggestPeers<T extends { slug: string; category: string; assets_b: number | null }>(slug: string, all: T[], n = 4) {
-  const me = all.find((i) => i.slug === slug);
-  if (!me) return [];
-  return all
-    .filter((i) => i.slug !== slug && i.category === me.category && i.assets_b != null)
-    .sort((a, b) => Math.abs(Math.log((a.assets_b ?? 1) / (me.assets_b ?? 1))) - Math.abs(Math.log((b.assets_b ?? 1) / (me.assets_b ?? 1))))
-    .slice(0, n)
-    .map((i) => i.slug);
-}

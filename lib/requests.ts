@@ -4,7 +4,7 @@
 const SUFFIX = /\b(the|corporation|corp|incorporated|inc|company|co|bancorp(oration)?|bancshares|bankshares|banc|financial|holdings?|group|federal credit union|credit union|fcu|bank|n\.?a\.?)\b\.?/gi;
 
 export function normalName(name: string) {
-  return name.toLowerCase().replace(/&/g, " and ").replace(SUFFIX, " ").replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+  return name.toLowerCase().replace(/\./g, "").replace(/&/g, " and ").replace(SUFFIX, " ").replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
 // True when two names plausibly mean the same institution.

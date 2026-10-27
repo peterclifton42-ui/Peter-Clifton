@@ -22,6 +22,7 @@ bypasses row-level security, so it lives only there and in Vercel.
     python3 pipeline/db.py new-live <request id> <slug>        # after publishing: link it, add to books, alert
     python3 pipeline/db.py new-failed <request id> "<reason>"  # couldn't build: record why, alert
     python3 pipeline/db.py set-regulatory-id <slug> <fdic|ncua> <id>   # FDIC cert (holding company's lead bank) or NCUA charter
+    python3 pipeline/db.py set-peer-group <slug> <proxy|10-k|investor deck> <url> <year> "<Peer A> | <Peer B> | ..."  # the bank's own disclosed peer group
 Every command prints JSON.
 """
 import argparse
@@ -109,6 +110,8 @@ def main():
     p = sub.add_parser("new-live"); p.add_argument("id", type=int); p.add_argument("slug")
     p = sub.add_parser("new-failed"); p.add_argument("id", type=int); p.add_argument("reason")
     p = sub.add_parser("set-regulatory-id"); p.add_argument("slug"); p.add_argument("source", choices=["fdic", "ncua"]); p.add_argument("id")
+    p = sub.add_parser("set-peer-group"); p.add_argument("slug"); p.add_argument("source", choices=["proxy", "10-k", "investor deck"])
+    p.add_argument("url"); p.add_argument("year", type=int); p.add_argument("names")
     a = ap.parse_args()
 
     if a.cmd == "check":
@@ -189,6 +192,36 @@ def main():
         request("POST", "regulatory_ids", {"slug": a.slug, "source": a.source, "id": a.id},
                 params={"on_conflict": "slug"}, prefer="resolution=merge-duplicates")
         out({"slug": a.slug, a.source: a.id})
+    elif a.cmd == "set-peer-group":
+        names = [n.strip() for n in a.names.split("|") if n.strip()]
+        if len(names) < 3:
+            sys.exit("A peer group needs at least 3 names, separated by |")
+        covered = request("GET", "institutions", params={"select": "slug,name"}) or []
+        peers = [{"name": n, "slug": next((c["slug"] for c in covered if c["slug"] != a.slug and same_institution(c["name"], n)), None)} for n in names]
+        request("POST", "peer_groups", {"slug": a.slug, "source": a.source, "source_url": a.url, "year": a.year, "peers": peers, "collected_at": now()},
+                params={"on_conflict": "slug"}, prefer="resolution=merge-duplicates")
+        out({"slug": a.slug, "peers": len(peers), "covered": [p["slug"] for p in peers if p["slug"]]})
+
+
+# Same matching as lib/requests.ts: corporate suffixes stripped, whole-word containment.
+SUFFIX = r"\b(the|corporation|corp|incorporated|inc|company|co|bancorp(oration)?|bancshares|bankshares|banc|financial|holdings?|group|federal credit union|credit union|fcu|bank|n\.?a\.?)\b\.?"
+
+
+def normal_name(name):
+    import re
+    s = re.sub(SUFFIX, " ", name.lower().replace(".", "").replace("&", " and "))
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]+", " ", s)).strip()
+
+
+def same_institution(a, b):
+    import re
+    x, y = normal_name(a), normal_name(b)
+    if not x or not y:
+        return False
+    if x == y:
+        return True
+    short, long = (x, y) if len(x) < len(y) else (y, x)
+    return len(short) >= 4 and re.search(rf"\b{re.escape(short)}\b", long) is not None
 
 
 if __name__ == "__main__":
