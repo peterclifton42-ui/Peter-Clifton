@@ -136,6 +136,7 @@ export default async function WhitespacePage({ searchParams }: { searchParams: P
             </nav>
           )}
           {teamView && <Link href="/whitespace/team">Manage team</Link>}
+          {teamView && <Link href="/whitespace/team#coverage">Assign banks</Link>}
           {book.banks.length > 0 && <a href="#grid">Jump to the grid ↓</a>}
         </div>
       </div>
