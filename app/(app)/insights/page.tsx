@@ -14,6 +14,16 @@ export const metadata: Metadata = { title: "Insights" };
 // Column names on phones, where each theme gets its own row of four cells.
 const SHORT: Record<Source, string> = { threat: "Threat", opportunity: "Opportunity", priority: "Priority", now: "Urgent now" };
 
+// Change since each dashboard's previous version, e.g. ▲3.
+function Delta({ d, what }: { d: number | undefined; what: string }) {
+  if (!d) return null;
+  return (
+    <span className={`delta ${d > 0 ? "up" : "down"}`} title={`${d > 0 ? "+" : ""}${d} ${what} since their previous version`}>
+      {d > 0 ? "▲" : "▼"}{Math.abs(d)}
+    </span>
+  );
+}
+
 function Examples({ examples, avoid }: { examples: ObjectionExample[]; avoid: boolean }) {
   return (
     <ul>
@@ -32,8 +42,9 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
   const viewer = await requireViewer();
   const scope = parseScope((await searchParams).scope);
   const supabase = await createClient();
-  const [{ data }, followed] = await Promise.all([
+  const [{ data }, { data: previous }, followed] = await Promise.all([
     supabase.from("insight_inputs").select(INSIGHT_COLUMNS),
+    supabase.from("insight_inputs_previous").select(INSIGHT_COLUMNS),
     followedSlugs(viewer.id),
   ]);
   const rows = inScope((data ?? []) as InsightInput[], scope, followed);
@@ -66,6 +77,28 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
   const topObjection = objections.find((o) => o.key !== "avoid" && o.key !== "other");
   const of = (n: number) => `${n} of ${rows.length}`;
 
+  // Trend: the same counts on each dashboard's previous version, for the
+  // dashboards that have one, against those dashboards now.
+  const before = inScope((previous ?? []) as InsightInput[], scope, followed);
+  const pairs = new Set(before.map((r) => r.slug));
+  const now = rows.filter((r) => pairs.has(r.slug));
+  const themeDelta = new Map<string, { banks: number } & Record<Source, number>>();
+  if (pairs.size) {
+    const was = new Map(themeResults(before).map((t) => [t.key, t]));
+    for (const t of themeResults(now)) {
+      const w = was.get(t.key);
+      themeDelta.set(t.key, {
+        banks: t.banks - (w?.banks ?? 0),
+        ...Object.fromEntries(SOURCES.map((s) => [s.key, t.counts[s.key] - (w?.counts[s.key] ?? 0)])) as Record<Source, number>,
+      });
+    }
+  }
+  const demandWas = new Map(productDemand(before).map((d) => [d.slug, d.p1 + d.p2]));
+  const demandDelta = new Map(pairs.size ? productDemand(now).map((d) => [d.slug, d.p1 + d.p2 - (demandWas.get(d.slug) ?? 0)]) : []);
+  for (const [slug, n] of demandWas) if (!demandDelta.has(slug)) demandDelta.set(slug, -n);
+  const objectionWas = new Map(objectionResults(before).map((o) => [o.key, o.banks]));
+  const objectionDelta = new Map(pairs.size ? objectionResults(now).map((o) => [o.key, o.banks - (objectionWas.get(o.key) ?? 0)]) : []);
+
   return (
     <main className="page">
       <div className="page-head">
@@ -90,13 +123,20 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
           <nav className="ins-jump" aria-label="On this page">
             <a href="#takeaways">Takeaways</a><a href="#themes">Themes</a><a href="#demand">Demand</a><a href="#yes">Objections</a>
           </nav>
+          {pairs.size > 0 && (
+            <p className="trend-note">
+              <span className="delta up">▲</span><span className="delta down">▼</span> show the change since each dashboard&apos;s previous
+              version (usually last quarter), across the <b>{pairs.size}</b> dashboard{pairs.size === 1 ? "" : "s"} that have one so far.
+              More are added as each bank&apos;s quarterly refresh lands.
+            </p>
+          )}
 
           <section id="takeaways" className="takeaways">
             {urgent && urgent.counts.now > 0 && (
               <a href="#themes" className="takeaway now">
                 <span className="tk-label">Most urgent right now</span>
                 <b>{urgent.label}</b>
-                <span>{of(urgent.counts.now)} dashboards say it&apos;s live now, in the sales timing.</span>
+                <span>{of(urgent.counts.now)} dashboards say it&apos;s live now, in the sales timing. <Delta d={themeDelta.get(urgent.key)?.now} what="dashboards" /></span>
               </a>
             )}
             {common && (
@@ -139,11 +179,11 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
               {themes.map((t) => (
                 <details key={t.key} className="heat-theme">
                   <summary className="heat-row" role="row">
-                    <span className="theme-name" role="rowheader"><b>{t.label}</b><span className="dim">{of(t.banks)} · {t.blurb}</span></span>
+                    <span className="theme-name" role="rowheader"><b>{t.label}</b><span className="dim">{of(t.banks)} <Delta d={themeDelta.get(t.key)?.banks} what="dashboards" /> · {t.blurb}</span></span>
                     {SOURCES.map((s) => (
                       <span key={s.key} role="cell" className={`heat-cell${s.key === "now" ? " now" : ""}${t.counts[s.key] ? "" : " zero"}`}
                         style={heat(s.key, t.counts[s.key])} title={`${t.label} · ${s.label}: ${t.counts[s.key]} of ${rows.length}`}>
-                        <span className="heat-label">{SHORT[s.key]}</span>{t.counts[s.key]}
+                        <span className="heat-label">{SHORT[s.key]}</span>{t.counts[s.key]}<Delta d={themeDelta.get(t.key)?.[s.key]} what="dashboards" />
                       </span>
                     ))}
                   </summary>
@@ -184,7 +224,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
                     {d.p2 > 0 && <i className="p2 end" style={{ width: `${(d.p2 / maxDemand) * 100}%` }} />}
                   </span>
                   <span className="num">
-                    <b>{d.p1 + d.p2}</b> <span className="dim">{d.p1} + {d.p2}{d.avgFit != null && ` (${d.avgFit})`}</span>
+                    <b>{d.p1 + d.p2}</b> <Delta d={demandDelta.get(d.slug)} what="dashboards ranking it 1 or 2" /> <span className="dim">{d.p1} + {d.p2}{d.avgFit != null && ` (${d.avgFit})`}</span>
                     {mine?.get(d.slug) ? <span className="yours-count">{mine.get(d.slug)} of yours</span> : null}
                   </span>
                 </li>
@@ -222,7 +262,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
                   <article key={o.key} className={`answer-card${avoid ? " avoid" : ""}`}>
                     <header>
                       <b>{avoid ? "⚠ Lines that backfire" : o.label}</b>
-                      <span className="dim">{o.banks} dashboard{o.banks === 1 ? "" : "s"}</span>
+                      <span className="dim">{o.banks} dashboard{o.banks === 1 ? "" : "s"} <Delta d={objectionDelta.get(o.key)} what="dashboards" /></span>
                     </header>
                     {first && (
                       <div className="best">
