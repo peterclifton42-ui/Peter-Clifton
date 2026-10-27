@@ -63,6 +63,7 @@ function nameMatchers(institutions: Institution[]) {
 export function banksIn(r: Pick<QuestionRow, "context" | "question">, matchers: ReturnType<typeof nameMatchers>) {
   const found = new Set<string>();
   if (r.context?.startsWith("bank:")) found.add(r.context.slice(5));
+  if (r.context?.startsWith("compare:")) for (const s of r.context.slice(8).split(",")) found.add(s);
   for (const m of matchers) if (m.test(r.question)) found.add(m.slug);
   return [...found];
 }

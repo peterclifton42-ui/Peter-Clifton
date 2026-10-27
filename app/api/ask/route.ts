@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { MODEL, askConfigured, runAsk, type AskContext, type AskEvent, type AskTurn } from "@/lib/ask/agent";
+import { MAX_COMPARE } from "@/lib/metrics";
 import { productBySlug } from "@/lib/products";
 import { createClient } from "@/lib/supabase/server";
 
@@ -33,6 +34,12 @@ export async function POST(request: NextRequest) {
   if (body?.context?.kind === "bank" && body.context.slug) {
     const { data } = await db.from("institutions").select("slug, name").eq("slug", body.context.slug).maybeSingle();
     if (data) context = { kind: "bank", slug: data.slug, name: data.name };
+  } else if (body?.context?.kind === "compare" && body.context.slug) {
+    const ids = [...new Set(body.context.slug.split(","))].slice(0, MAX_COMPARE);
+    const { data } = await db.from("institutions").select("slug, name").in("slug", ids);
+    const names = new Map((data ?? []).map((i) => [i.slug as string, i.name as string]));
+    const found = ids.filter((s) => names.has(s));
+    if (found.length) context = { kind: "compare", slug: found.join(","), name: found.map((s) => `${names.get(s)} (${s})`).join(", ") };
   } else if (body?.context?.kind === "product" && body.context.slug) {
     const p = productBySlug(body.context.slug);
     if (p) context = { kind: "product", slug: p.slug, name: p.name };
