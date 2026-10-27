@@ -86,6 +86,7 @@ export function Directory({ institutions, followed, earnings }: Props) {
       </div>
       <div className="count">
         {rows.length} of {institutions.length} institutions
+        {rows.length === 0 && <> · Not covered yet? <Link href="/banks/request">Request a dashboard for it</Link></>}
       </div>
       <div className="table-wrap">
         <table>

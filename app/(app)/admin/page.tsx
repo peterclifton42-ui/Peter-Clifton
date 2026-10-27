@@ -34,6 +34,7 @@ export default async function AdminPage() {
     supabase.from("whitespace").select("id", { count: "exact", head: true }),
     supabase.from("whitespace").select("id", { count: "exact", head: true }).eq("is_demo", true),
   ]);
+  const { count: newQueued } = await supabase.from("institution_requests").select("id", { count: "exact", head: true }).in("status", ["queued", "building"]);
   const demoSellers = (users ?? []).filter((u) => (u as { is_demo?: boolean }).is_demo).length;
   const emailOf = new Map((users ?? []).map((u) => [u.id as string, (u.full_name || u.email) as string]));
   const askCost = (asks ?? []).reduce((sum, a) => sum + Number(a.cost_usd ?? 0), 0);
@@ -67,8 +68,9 @@ export default async function AdminPage() {
       <div className="panel">
         <h2>Automatic updates</h2>
         <p>
-          A refresh job researches one out-of-date dashboard twice a day (most-followed banks first), and a weekly job
-          confirms results dates and collects news. Their recent runs:
+          A refresh job researches one dashboard twice a day (requested new institutions first, then out-of-date
+          dashboards, most-followed first), and a weekly job confirms results dates and collects news.{" "}
+          <Link href="/banks/request">New institution requests ({newQueued ?? 0} in the queue)</Link>. Recent runs:
         </p>
         {(runs ?? []).length === 0 ? <p className="dim">No runs yet.</p> : (
           <div className="table-wrap flat">

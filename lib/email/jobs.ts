@@ -28,7 +28,7 @@ const firstName = (p: Person) => p.full_name?.split(" ")[0] ?? null;
 
 // ---- Instant alerts: one email per person covering everything new since the last run.
 
-const INSTANT_KINDS = ["dashboard", "results"];
+const INSTANT_KINDS = ["dashboard", "results", "request"];
 
 export async function runAlerts(db: SupabaseClient) {
   const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
@@ -57,6 +57,7 @@ export async function runAlerts(db: SupabaseClient) {
     }
     const dashboards = items.filter((n) => n.kind === "dashboard");
     const results = items.filter((n) => n.kind === "results");
+    const requested = items.filter((n) => n.kind === "request");
     const toItem = (n: (typeof items)[number]): Item => ({ title: n.title, body: n.body, link: n.link });
     const subject = items.length === 1 ? items[0].title : `${items.length} updates on banks you follow`;
     const email: Email = {
@@ -66,6 +67,7 @@ export async function runAlerts(db: SupabaseClient) {
         heading: subject,
         intro: `${firstName(person) ? `Hi ${firstName(person)}, here` : "Here"}'s what just changed for the banks you follow.`,
         sections: [
+          { heading: "New dashboards you requested", items: requested.map(toItem) },
           { heading: "Dashboards updated", items: dashboards.map(toItem) },
           { heading: "Results out", items: results.map(toItem) },
         ],
