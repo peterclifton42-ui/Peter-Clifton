@@ -1,24 +1,37 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { clearDemoWhitespace } from "../whitespace/actions";
 import { createUser, removeUser, sendEmailPreview, sendPasswordLink, setRole, type AdminState } from "./actions";
+
+function CopyLink({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="copy-link">
+      <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} aria-label="Link to send" />
+      <button type="button" className="secondary" onClick={() => navigator.clipboard?.writeText(url).then(() => setCopied(true))}>{copied ? "Copied" : "Copy"}</button>
+    </div>
+  );
+}
 
 function LinkResult({ state }: { state: AdminState }) {
   if (state?.error) return <div className="notice error">{state.error}</div>;
   if (!state?.link) return null;
   const { email, kind, url, emailed, emailError } = state.link;
   const what = kind === "invite" ? "invite" : "password reset link";
+  const life = kind === "invite" ? "for 7 days" : "for 2 hours";
   if (emailed) {
-    return <div className="notice ok">Sent the {what} to {email}. {kind === "invite" ? "The link works for 7 days." : "The link works for 2 hours."}</div>;
+    return (
+      <div className="notice ok">
+        Sent the {what} to {email}. If it doesn&apos;t arrive, send them this same link yourself (it works {life}, once):
+        <CopyLink url={url} />
+      </div>
+    );
   }
   return (
     <div className="notice info">
-      Couldn&apos;t email {email}, so send them this {what} yourself (it works {kind === "invite" ? "for 7 days" : "for 2 hours"}, once):
-      <div className="copy-link">
-        <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} aria-label="Link to send" />
-        <button type="button" className="secondary" onClick={() => navigator.clipboard?.writeText(url)}>Copy</button>
-      </div>
+      Couldn&apos;t email {email}, so send them this {what} yourself (it works {life}, once):
+      <CopyLink url={url} />
       <span className="dim">Why: {emailError}</span>
     </div>
   );
