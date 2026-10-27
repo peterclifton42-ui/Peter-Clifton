@@ -6,7 +6,9 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 type Turn = { role: "user" | "assistant"; content: string; logId?: number | null; rating?: 1 | -1; error?: boolean };
-export type ChatContext = { kind: "bank" | "product"; slug: string; name: string } | null;
+// For a comparison, slug is the comma-separated ids in page order, name lists
+// them and focus is the first one's name (for the starter questions).
+export type ChatContext = { kind: "bank" | "product" | "compare"; slug: string; name: string; focus?: string } | null;
 
 const STARTERS: Record<string, string[]> = {
   market: [
@@ -25,6 +27,12 @@ const STARTERS: Record<string, string[]> = {
     "Which three banks should I call first for this, and what do I say?",
     "What objections will I hear, and how do I answer them?",
     "Which of the banks I follow are a fit?",
+  ],
+  compare: [
+    "Summarise this comparison: who stands out, and on what?",
+    "Where is {focus} weaker than the others, and which Curinos products help with that?",
+    "Which of these looks under the most deposit pressure, and why?",
+    "Turn this into three talking points for a call with {focus}.",
   ],
 };
 
@@ -116,7 +124,7 @@ export function AskChat({ context, compact = false }: { context: ChatContext; co
     await fetch("/api/ask/rate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: turn.logId, rating, comment }) });
   }
 
-  const starters = STARTERS[context?.kind ?? "market"];
+  const starters = STARTERS[context?.kind ?? "market"].map((s) => s.replace("{focus}", context?.focus ?? "the first institution"));
 
   return (
     <div className={`ask${compact ? " compact" : ""}`}>
@@ -124,7 +132,7 @@ export function AskChat({ context, compact = false }: { context: ChatContext; co
         {turns.length === 0 && (
           <div className="ask-empty">
             <p className="dim">
-              {context ? `Ask anything about ${context.name}. ` : "Ask about any bank, product or the whole market. "}
+              {context?.kind === "compare" ? "Ask anything about this comparison. " : context ? `Ask anything about ${context.name}. ` : "Ask about any bank, product or the whole market. "}
               Answers come from the app&apos;s dashboards, news, calendar and call report figures, with links to the source.
             </p>
             <div className="starters">
@@ -164,7 +172,7 @@ export function AskChat({ context, compact = false }: { context: ChatContext; co
       <form className="ask-form" onSubmit={(e) => { e.preventDefault(); ask(input); }}>
         <textarea
           value={input} rows={compact ? 2 : 3} maxLength={4000}
-          placeholder={context ? `Ask about ${context.name}…` : "Ask a question…"}
+          placeholder={context?.kind === "compare" ? "Ask about this comparison…" : context ? `Ask about ${context.name}…` : "Ask a question…"}
           aria-label="Your question"
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(input); } }}
@@ -192,12 +200,12 @@ export function AskDrawer({ context }: { context: NonNullable<ChatContext> }) {
   }, [open]);
   return (
     <>
-      <button type="button" className="ask-open" onClick={() => setOpen(true)}>Ask about this {context.kind}</button>
+      <button type="button" className="ask-open" onClick={() => setOpen(true)}>Ask about this {context.kind === "compare" ? "comparison" : context.kind}</button>
       {open && (
         <div className="drawer-backdrop" onClick={() => setOpen(false)}>
           <aside className="drawer" role="dialog" aria-label={`Ask about ${context.name}`} onClick={(e) => e.stopPropagation()}>
             <div className="drawer-head">
-              <b>Ask about {context.name}</b>
+              <b>{context.kind === "compare" ? "Ask about this comparison" : `Ask about ${context.name}`}</b>
               <button type="button" className="link" onClick={() => setOpen(false)} aria-label="Close">✕</button>
             </div>
             <AskChat context={context} compact />

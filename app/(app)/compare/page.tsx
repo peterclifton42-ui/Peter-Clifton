@@ -8,6 +8,7 @@ import {
 } from "@/lib/metrics";
 import { createClient } from "@/lib/supabase/server";
 import { peerSuggestions } from "@/lib/peers";
+import { AskDrawer } from "../ask/ask-chat";
 import { Picker, type Option } from "./picker";
 import { TrendChart } from "./trend-chart";
 
@@ -71,6 +72,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
             (every charter a holding company owns, added together) and NCUA call reports for credit unions.
           </p>
         </div>
+        {ids.length > 0 && <AskDrawer context={{ kind: "compare", slug: ids.join(","), name: ids.map((s) => byName.get(s)?.name ?? s).join(", "), focus: byName.get(ids[0])?.name }} />}
       </div>
 
       <div className="panel">

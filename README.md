@@ -26,6 +26,8 @@ Roles: **pending** (signed up but no access), **seller** (can see everything), *
 
 `/compare` puts up to six institutions side by side on official call report figures, held in `regulatory_metrics`. `pipeline/regulatory.py` loads them (the weekly job runs it): FDIC BankFind for banks, adding up every active charter the holding company owns, and NCUA's quarterly 5300 files for credit unions. Which filing belongs to which institution is in `pipeline/regulatory-ids.csv`; add a row there when a new institution is added. The metric definitions are in `lib/metrics.ts` and shown on the page.
 
+**Ask about this comparison** opens the assistant with every institution in the comparison (in page order, the first treated as the focus), so it can explain who stands out, where the focus bank trails its peers and what to say on a call. Those questions are logged with the context `compare:<ids>`.
+
 **Peers.** "Find peers for" (and the "peers" button on each chip, and "Compare peers" on a bank page) fills the comparison with an institution and its five closest peers, with the reason for each shown under the picker. `lib/peers.ts` does the ranking:
 
 1. **Its own disclosed peer group first.** Public banks name the peers they benchmark against, mostly in the compensation section of their proxy statement (DEF 14A). The refresh job records it with `python3 pipeline/db.py set-peer-group <slug> proxy <url> <year> "Bank A | Bank B | ..."` into `peer_groups`; members we cover rank first.

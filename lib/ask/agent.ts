@@ -34,7 +34,7 @@ Curinos product rules (apply them even if a dashboard says otherwise):
 - Only quote proof points and figures that appear in the tool results.`;
 
 export type AskTurn = { role: "user" | "assistant"; content: string };
-export type AskContext = { kind: "bank" | "product"; slug: string; name: string } | null;
+export type AskContext = { kind: "bank" | "product" | "compare"; slug: string; name: string } | null;
 export type AskEvent =
   | { type: "status"; text: string }
   | { type: "text"; text: string }
@@ -55,7 +55,9 @@ export async function runAsk(opts: {
 
   // What the seller is looking at, and today's date, ride on the latest question so
   // the system prompt and tool list stay identical (and cached) across requests.
-  const where = opts.context
+  const where = opts.context?.kind === "compare"
+    ? `The user is on the Compare page, looking at these institutions side by side on official call report figures, in this order (the first is usually the one they sell to, the rest its peers): ${opts.context.name}. "This comparison", "these banks" and "the first one" refer to them. Start with get_official_metrics for all of them, then read dashboards where they explain a difference. Link the comparison as [this comparison](/compare?ids=${opts.context.slug}).`
+    : opts.context
     ? `The user is on the ${opts.context.kind} page for ${opts.context.name} (slug ${opts.context.slug}); "this bank" or "this product" means it.`
     : "The user is on the Ask page (whole market).";
   const preface = `[Today is ${todayISO()}. ${opts.userName ? `The user is ${opts.userName}. ` : ""}${where}]`;

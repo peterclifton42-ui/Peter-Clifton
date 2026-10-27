@@ -114,7 +114,7 @@ export default async function QuestionsPage({ searchParams }: { searchParams: Pr
               <span className="qa-q">{r.question}</span>
               <span className="qa-meta">
                 {people.get(r.user_id) ?? "Unknown"} · {when(r.created_at)}
-                {r.context && <> · asked on {r.context.startsWith("bank:") ? institutions.get(r.context.slice(5)) ?? r.context.slice(5) : productBySlug(r.context.slice(8))?.name ?? r.context.slice(8)}</>}
+                {r.context && <> · asked on {r.context.startsWith("compare:") ? <Link href={`/compare?ids=${r.context.slice(8)}`}>a comparison of {r.context.slice(8).split(",").length}</Link> : r.context.startsWith("bank:") ? institutions.get(r.context.slice(5)) ?? r.context.slice(5) : productBySlug(r.context.slice(8))?.name ?? r.context.slice(8)}</>}
                 {r.rating === 1 && " · 👍"}{r.rating === -1 && " · 👎"}
                 {r.shortfall && r.shortfall !== "thumbs down" && <span className="badge medium">{r.shortfall}</span>}
               </span>
