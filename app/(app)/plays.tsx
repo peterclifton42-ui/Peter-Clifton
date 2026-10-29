@@ -24,6 +24,11 @@ export function PlayList({ plays, compact = false }: { plays: Play[]; compact?: 
                 </span>
               )}
               <span className="dim">{p.category === "credit_union" ? "Credit union" : "Bank"} · {formatAssets(p.assets)}</span>
+              {p.clientOf.length > 0 && (
+                <span className="ws-pill ws-client" title={`Already a client for ${p.clientOf.join(", ")}`}>
+                  Client: {p.clientOf.length === 1 ? p.clientOf[0] : `${p.clientOf.length} products`}
+                </span>
+              )}
             </div>
             {p.why && !compact && <p className="play-why">{p.why}</p>}
             {p.talk && (
