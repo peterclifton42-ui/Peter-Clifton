@@ -68,9 +68,10 @@ export async function saveWhitespace(_prev: SaveState, formData: FormData): Prom
   return { saved: true };
 }
 
-function revalidate(slug: string) {
-  revalidatePath(`/banks/${slug}/whitespace`);
-  revalidatePath("/whitespace");
+// Whitespace feeds Home, Products, the bank pages and the Whitespace views, so a
+// save refreshes them all (the slug is kept for callers that pass it).
+function revalidate(_slug: string) {
+  revalidatePath("/", "layout");
 }
 
 // Admin: remove every demo row, its history and snapshots, and the demo sellers.

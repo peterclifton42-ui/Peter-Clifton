@@ -10,12 +10,19 @@ import { applicability, lostExpired, type WhitespaceRow } from "./whitespace";
 export type Play = {
   slug: string; bankName: string; assets: number | null; category: string;
   product: CatalogueProduct; pri: number; fit: number | null; why: string | null; talk: string | null;
+  clientOf: string[]; // products this institution already buys, so the play is a cross-sell
 };
 
 // Research-backed P1/P2 products at these institutions that nobody has reviewed in
 // whitespace yet (or whose loss window has passed), best first.
 export function nextPlays(rows: InsightInput[], whitespace: WhitespaceRow[], limit = 10, today = new Date()): Play[] {
   const reviewed = new Set(whitespace.filter((w) => !lostExpired(w, today)).map((w) => `${w.slug}|${w.product_slug}`));
+  const clients = new Map<string, string[]>();
+  for (const w of whitespace) {
+    if (w.status !== "client") continue;
+    const name = PRODUCTS.find((p) => p.slug === w.product_slug)?.name ?? w.product_slug;
+    clients.set(w.slug, [...(clients.get(w.slug) ?? []), name]);
+  }
   const plays: Play[] = [];
   for (const r of rows) {
     const ruledOut = new Set((r.dnr_products ?? []).map((d) => productFor(d.name)?.slug).filter(Boolean));
@@ -30,6 +37,7 @@ export function nextPlays(rows: InsightInput[], whitespace: WhitespaceRow[], lim
       plays.push({
         slug: r.slug, bankName: r.name, assets: r.assets_b, category: r.category, product, pri,
         fit: typeof dp.fit === "number" ? dp.fit : null, why: dp.why ?? null, talk: dp.talk ?? null,
+        clientOf: clients.get(r.slug) ?? [],
       });
     }
   }
