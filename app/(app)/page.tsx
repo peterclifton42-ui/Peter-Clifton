@@ -9,6 +9,9 @@ import { categoryLabel, formatAssets, INSTITUTION_COLUMNS, shortQuarter, type In
 import { createClient } from "@/lib/supabase/server";
 import { WHITESPACE_COLUMNS, bookOf, formatQuarter, formatUsd, quarterOf, totals, type WhitespaceRow } from "@/lib/whitespace";
 import { loadTeam } from "@/lib/team";
+import { nextPlays } from "@/lib/plays";
+import type { InsightInput } from "@/lib/insights";
+import { PlayList } from "./plays";
 import { FollowButton } from "./follow-button";
 
 export const metadata: Metadata = { title: "Home" };
@@ -44,10 +47,12 @@ export default async function HomePage() {
   const bookBanks = all.filter((i) => booked.has(i.slug));
   const teamSlugs = [...new Set(team.flatMap((m) => m.banks))];
   const wsSlugs = [...new Set([...booked, ...teamSlugs])];
-  const [{ data: research }, { data: wsRows }] = wsSlugs.length
+  // Plays come from the book (and team), else the banks followed, else the market's HIGH-opportunity banks.
+  const playSlugs = wsSlugs.length ? wsSlugs : followed.size ? [...followed] : all.filter((i) => i.opportunity === "HIGH").map((i) => i.slug);
+  const [{ data: research }, { data: wsRows }] = playSlugs.length
     ? await Promise.all([
-      supabase.from("insight_inputs").select("slug, products, dnr_products").in("slug", wsSlugs),
-      supabase.from("whitespace").select(WHITESPACE_COLUMNS).in("slug", wsSlugs),
+      supabase.from("insight_inputs").select("slug, name, category, assets_b, products, dnr_products").in("slug", playSlugs),
+      supabase.from("whitespace").select(WHITESPACE_COLUMNS).in("slug", playSlugs),
     ])
     : [{ data: [] }, { data: [] }];
   const allWs = (wsRows ?? []) as WhitespaceRow[];
@@ -59,6 +64,19 @@ export default async function HomePage() {
     .filter((e) => needsRefresh(e, summary.get(e.slug)?.researched_at ?? null))
     .sort((a, b) => b.event_date.localeCompare(a.event_date));
   const firstName = viewer.fullName?.split(" ")[0];
+  const plays = nextPlays((research ?? []) as InsightInput[], allWs, 3);
+  const playSource = wsSlugs.length ? "your book" : followed.size ? "the banks you follow" : "high-opportunity banks";
+
+  // Everything else worth doing now, most time-sensitive first.
+  type Action = { kind: "prep" | "refresh" | "warn" | "info" | "good"; label: string; text: string; href: string };
+  const actions: Action[] = [];
+  for (const e of evs.filter((e) => followed.has(e.slug) && e.kind === "earnings" && e.status !== "reported" && e.event_date >= today && e.event_date <= addDays(today, 7))) {
+    actions.push({ kind: "prep", label: "Prep", text: `${bySlug.get(e.slug)?.name ?? e.slug} reports ${e.period} on ${formatDay(e.event_date)}: brush up before the call`, href: `/banks/${e.slug}` });
+  }
+  for (const st of book.steps.slice(0, 3)) actions.push({ kind: st.tone, label: "Whitespace", text: st.text, href: st.href });
+  for (const e of stale.filter((e) => followed.has(e.slug)).slice(0, 2)) {
+    actions.push({ kind: "refresh", label: "Update", text: `${bySlug.get(e.slug)?.name ?? e.slug} reported ${e.period}; its dashboard isn't updated yet. Request a full refresh`, href: `/banks/${e.slug}` });
+  }
 
   return (
     <main className="page">
@@ -68,6 +86,38 @@ export default async function HomePage() {
           <p>{formatDay(today)} · what&apos;s happening at the banks you follow, and across the market.</p>
         </div>
       </div>
+
+      <section className="nba">
+        <div className="panel nba-plays">
+          <div className="panel-head">
+            <h2>Your next best plays</h2>
+            <Link href="/products#plays">See all plays →</Link>
+          </div>
+          <p className="dim">Products the research rates priority 1 or 2 at {playSource}, not yet reviewed in Whitespace.</p>
+          {plays.length ? <PlayList plays={plays} compact /> : (
+            <p className="dim">Nothing waiting: every research-backed product at your banks has a status. <Link href="/whitespace">Open Whitespace →</Link></p>
+          )}
+          {!wsSlugs.length && <p className="dim small">Mark banks as <b>My account</b> on their page to base this on your own book.</p>}
+        </div>
+        <div className="panel nba-todo">
+          <h2>Also on your plate</h2>
+          {actions.length === 0 ? <p className="dim">Nothing time-sensitive at your banks right now.</p> : (
+            <ul className="todo">
+              {actions.slice(0, 6).map((a, i) => (
+                <li key={i} className={`todo-${a.kind}`}>
+                  <span className="todo-label">{a.label}</span>
+                  <Link href={a.href}>{a.text} →</Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          <nav className="nba-links" aria-label="Go to">
+            <Link href="/products">Product playbooks</Link>
+            <Link href="/insights">Market insights</Link>
+            <Link href="/compare">Compare peers</Link>
+          </nav>
+        </div>
+      </section>
 
       {(bookBanks.length > 0 || teamTotals) && (
         <section className="panel">
@@ -81,11 +131,6 @@ export default async function HomePage() {
             <div className="stat"><b>{book.totals.dueThisQuarter}</b><span>due by {formatQuarter(quarterOf(new Date()))}</span></div>
             <div className="stat"><b>{book.applicable ? Math.round((book.reviewed / book.applicable) * 100) : 0}%</b><span>products reviewed</span></div>
           </div>
-          {book.steps.length > 0 && (
-            <ul className="next-steps">
-              {book.steps.slice(0, 3).map((st, i) => <li key={i} className={st.tone}><Link href={st.href}>{st.text} →</Link></li>)}
-            </ul>
-          )}
           {teamTotals && (
             <p className="team-line">
               <b>Your team</b> ({team.length} sellers, {teamSlugs.length} banks): {formatUsd(teamTotals.validated.acv) || "$0"} validated ·{" "}
