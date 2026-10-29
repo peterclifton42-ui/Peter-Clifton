@@ -40,6 +40,8 @@ Roles: **pending** (signed up but no access), **seller** (can see everything), *
 - The catalogue's guardrails are applied in the app: roadmap and unlisted products are labelled and capped at priority 3, and UK-only products are not recommended to US institutions, even on dashboards written before catalogue V4.
 - The product list comes from `lib/catalogue.json`. After editing the catalogue, run `python3 pipeline/catalogue.py` and commit the JSON.
 
+**Next best plays and product playbooks.** `lib/plays.ts` picks the plays: research-backed priority 1–2 products at the seller's book (managers: plus their team's; otherwise the banks they follow, otherwise the market) that have no whitespace status yet, best first and spread across banks. Home shows the top three next to "Also on your plate" (results this week at followed banks, whitespace steps, dashboards behind new results); `/products` shows eight, a demand-vs-fit quadrant (split at the medians, bubble size = pipeline) and a playbook card per product. "Lead with" themes are ranked by how much more often they come up at the institutions that need the product than across the market.
+
 ## Refresh buttons and news history
 
 - **Refresh menu** on every bank page: *Refresh news* runs a web search now; *Request full refresh* asks for the whole dashboard to be re-researched. A full-refresh request records a `refresh_requests` row. The scheduled refresh job (on the Claude plan, 00:07 and 12:07 UTC) takes requested institutions first. Publishing closes the request and alerts whoever asked.
