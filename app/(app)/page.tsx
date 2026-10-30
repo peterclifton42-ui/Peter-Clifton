@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { WHITESPACE_COLUMNS, bookOf, formatQuarter, formatUsd, quarterOf, totals, type WhitespaceRow } from "@/lib/whitespace";
 import { loadTeam } from "@/lib/team";
 import { nextPlays } from "@/lib/plays";
+import { unconfirmedGap } from "@/lib/products";
 import type { InsightInput } from "@/lib/insights";
 import { PlayList } from "./plays";
 import { FollowButton } from "./follow-button";
@@ -68,12 +69,21 @@ export default async function HomePage() {
   const playSource = wsSlugs.length ? "your book" : followed.size ? "the banks you follow" : "high-opportunity banks";
 
   // Everything else worth doing now, most time-sensitive first.
-  type Action = { kind: "prep" | "refresh" | "warn" | "info" | "good"; label: string; text: string; href: string };
+  type Action = { kind: "prep" | "refresh" | "warn" | "info" | "good" | "check"; label: string; text: string; href: string };
   const actions: Action[] = [];
   for (const e of evs.filter((e) => followed.has(e.slug) && e.kind === "earnings" && e.status !== "reported" && e.event_date >= today && e.event_date <= addDays(today, 7))) {
     actions.push({ kind: "prep", label: "Prep", text: `${bySlug.get(e.slug)?.name ?? e.slug} reports ${e.period} on ${formatDay(e.event_date)}: brush up before the call`, href: `/banks/${e.slug}` });
   }
   for (const st of book.steps.slice(0, 3)) actions.push({ kind: st.tone, label: "Whitespace", text: st.text, href: st.href });
+  // Strong fits held at P3 only because one fact wasn't confirmed: worth asking about.
+  for (const r of ((research ?? []) as InsightInput[])) {
+    for (const dp of r.products ?? []) {
+      const gap = (dp.fit ?? 0) >= 70 && Number(dp.pri) === 3 ? unconfirmedGap(dp) : null;
+      if (gap && actions.filter((a) => a.kind === "check").length < 2) {
+        actions.push({ kind: "check", label: "Check", text: `${r.name}: ${dp.name} fits at ${dp.fit} but needs confirming ${gap}`, href: `/banks/${r.slug}` });
+      }
+    }
+  }
   for (const e of stale.filter((e) => followed.has(e.slug)).slice(0, 2)) {
     actions.push({ kind: "refresh", label: "Update", text: `${bySlug.get(e.slug)?.name ?? e.slug} reported ${e.period}; its dashboard isn't updated yet. Request a full refresh`, href: `/banks/${e.slug}` });
   }

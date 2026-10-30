@@ -7,7 +7,7 @@ import { loadTeam } from "@/lib/team";
 import { formatAssets } from "@/lib/institutions";
 import { INSIGHT_COLUMNS, inScope, parseScope, type InsightInput } from "@/lib/insights";
 import { firstSentence, productSummaries, resonance, type Target } from "@/lib/plays";
-import { CATALOGUE_SOURCE, boldParts, effectivePriority, productBySlug, productFor, sellerBlocks, statusLabel } from "@/lib/products";
+import { CATALOGUE_SOURCE, boldParts, effectivePriority, productBySlug, productFor, sellerBlocks, statusLabel, unconfirmedGap } from "@/lib/products";
 import { createClient } from "@/lib/supabase/server";
 import { STATUS_KEYS, WHITESPACE_COLUMNS, formatQuarter, formatUsd, lostExpired, type WhitespaceRow } from "@/lib/whitespace";
 import { StatusPill } from "../../whitespace/editor";
@@ -68,8 +68,9 @@ export default async function ProductPage({ params, searchParams }: Props) {
   const top = summary.targets;
   const p3 = rows.flatMap((r) => {
     const dp = (r.products ?? []).find((p) => productFor(p.name)?.slug === product.slug);
-    return dp && effectivePriority(product, dp) === 3 ? [{ r, dp }] : [];
-  });
+    return dp && effectivePriority(product, dp) === 3 ? [{ r, dp, gap: (dp.fit ?? 0) >= 60 ? unconfirmedGap(dp) : null }] : [];
+  }).sort((a, b) => Number(Boolean(b.gap)) - Number(Boolean(a.gap)) || (b.dp.fit ?? 0) - (a.dp.fit ?? 0));
+  const checks = p3.filter((e) => e.gap);
   const gated = rows.flatMap((r) => {
     const d = (r.dnr_products ?? []).find((p) => productFor(p.name)?.slug === product.slug);
     return d ? [{ r, reason: d.reason ?? "" }] : [];
@@ -132,10 +133,24 @@ export default async function ProductPage({ params, searchParams }: Props) {
               <CallList targets={top.slice(12)} followed={followed} start={13} />
             </details>
           )}
-          {p3.length > 0 && (
+          {checks.length > 0 && (
+            <div className="check-list">
+              <h3>Worth checking ({checks.length})</h3>
+              <p className="dim">Strong fits held at priority 3 only because the research couldn&apos;t confirm one fact. Confirm it on the call and they&apos;re live.</p>
+              <ul className="plain">
+                {checks.map(({ r, dp, gap }) => (
+                  <li key={r.slug}>
+                    <Link href={`/banks/${r.slug}`}>{r.name}</Link> <span className="badge medium">Fit {dp.fit}</span>
+                    <span className="dim"> Check {gap}.</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {p3.length > checks.length && (
             <details>
-              <summary>Priority 3 ({p3.length})</summary>
-              <ul className="plain">{p3.map(({ r, dp }) => <li key={r.slug}><Link href={`/banks/${r.slug}`}>{r.name}</Link>{dp.why && <span className="dim"> — {firstSentence(dp.why, 140)}</span>}</li>)}</ul>
+              <summary>Priority 3 ({p3.length - checks.length})</summary>
+              <ul className="plain">{p3.filter((e) => !e.gap).map(({ r, dp }) => <li key={r.slug}><Link href={`/banks/${r.slug}`}>{r.name}</Link>{dp.why && <span className="dim"> — {firstSentence(dp.why, 140)}</span>}</li>)}</ul>
             </details>
           )}
           {gated.length > 0 && (

@@ -411,6 +411,9 @@ def fmt(key, v):
 
 
 # --------------------------------------------------------------------------------------
+ALCO_PRESUMED_ASSETS_B = 10
+
+
 def score_product(p, inp, D):
     seg = inp.get("segments", {}) or {}
     tech = inp.get("techStack", {}) or {}
@@ -443,6 +446,11 @@ def score_product(p, inp, D):
     unknown = []
     for s in p["required"]:
         v = seg.get(s)
+        # An ALCO is a regulatory expectation at $10B and above, so it is presumed
+        # there unless the evidence says otherwise (owner's rule, Oct 2026).
+        if s == "alco" and v is None and assets >= ALCO_PRESUMED_ASSETS_B:
+            v = True
+            r["notes"].append(f"ALCO presumed (${assets:.1f}B is at or above ${ALCO_PRESUMED_ASSETS_B:g}B)")
         if v is False:
             fail(f"Segment/function absent: {s}")
         elif v is None:
