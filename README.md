@@ -42,6 +42,8 @@ Roles: **pending** (signed up but no access), **seller** (can see everything), *
 
 **Next best plays and product playbooks.** `lib/plays.ts` picks the plays: research-backed priority 1–2 products at the seller's book (managers: plus their team's; otherwise the banks they follow, otherwise the market) that have no whitespace status yet, best first and spread across banks. Home shows the top three next to "Also on your plate" (results this week at followed banks, whitespace steps, dashboards behind new results); `/products` shows eight, a demand-vs-fit quadrant (split at the medians, bubble size = pipeline) and a playbook card per product. "Lead with" themes are ranked by how much more often they come up at the institutions that need the product than across the market.
 
+**Priority caps.** The scorer (`reference/score_v4.py`) holds a product at P3 when a fact it depends on is unconfirmed ("Unknown ≠ absent"). An ALCO is presumed at $10B and above. The refresh job closes these gaps before publishing (`REFRESH_TASK.md` step 4b: branch counts from FDIC BankFind, other facts from the institution's own pages). Strong fits still held back show under **Worth checking** on product pages and as **Check** on Home. The `insight_inputs` view carries each product's `caps` for this.
+
 ## Refresh buttons and news history
 
 - **Refresh menu** on every bank page: *Refresh news* runs a web search now; *Request full refresh* asks for the whole dashboard to be re-researched. A full-refresh request records a `refresh_requests` row. The scheduled refresh job (on the Claude plan, 00:07 and 12:07 UTC) takes requested institutions first. Publishing closes the request and alerts whoever asked.

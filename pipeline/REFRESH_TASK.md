@@ -98,6 +98,15 @@ cd /tmp/refresh && python3 score_v4.py intel.json --write
 - Re-run until it exits with code 0.
 - If a score looks wrong, the evidence is wrong. Fix `scoringInputs`; never edit `fit`, `pri` or `scoring` by hand.
 
+### Step 4b — Close the "unknown" caps before publishing
+
+A product capped with **"Unknown ≠ absent: unconfirmed …"** has a fact the research didn't settle, not a fact that's false. For every such product with **fit 60 or more**, settle the fact before publishing, then re-run the scorer:
+
+- **Branch count:** take it from the regulator, no web call needed. Banks: `https://api.fdic.gov/banks/institutions?filters=CERT:<cert>&fields=NAME,OFFICES,REPDTE` (the FDIC cert is in `pipeline/regulatory-ids.csv`); set `scoringInputs.branches` to `OFFICES`. Credit unions: the institution's own branch finder or latest annual report; if only a lower bound is sourced, set `branchesMin`.
+- **smallBusiness / sbLending / treasuryManagement / cashSweep / commercial:** one search each on the institution's own site (business banking, SBA lending, treasury management or sweep pages) or its 10-K. Set the segment to `true` with the page as the source, or `false` if the institution clearly doesn't offer it.
+- **alco:** presumed at $10B and above (the scorer does this); below $10B, look for an asset-liability committee in the 10-K or proxy.
+- Budget: at most 4 calls for this step. A fact you still can't settle stays `null`, and the cap stays, with the gap stated.
+
 ## Step 5 — Completeness and contamination gates
 
 ```bash

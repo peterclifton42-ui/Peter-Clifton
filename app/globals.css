@@ -937,3 +937,8 @@ details.about > summary h2 { margin: 0; }
 details.about > summary::after { content: "Show ▾"; margin-left: auto; font-size: 12.5px; color: var(--accent-text); }
 details.about[open] > summary::after { content: "Hide ▴"; }
 .more-calls > summary { cursor: pointer; color: var(--accent-text); font-size: 13px; margin: 8px 0; }
+
+.check-list { margin-top: 14px; padding: 12px 14px; border-radius: 8px; border: 1px dashed rgba(245, 158, 11, .45); background: rgba(245, 158, 11, .06); }
+.check-list h3 { margin: 0 0 4px; }
+.check-list ul { margin: 8px 0 0; display: grid; gap: 6px; font-size: 13.5px; }
+ul.todo li.todo-check { border-left-color: var(--warn); }

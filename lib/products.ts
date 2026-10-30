@@ -97,7 +97,27 @@ export type DashboardProduct = {
   name?: string; cat?: string; pri?: number | string; fit?: number;
   what?: string; why?: string; need?: string; talk?: string; time?: string; roi?: string;
   use?: string[]; objections?: { q?: string; a?: string }[];
+  caps?: string | string[] | null; // why the scorer held the priority down
 };
+
+const GAP_WORDS: Record<string, string> = {
+  smallBusiness: "that it serves small businesses", sbLending: "that it does small business lending",
+  treasuryManagement: "that it offers treasury management", cashSweep: "that it runs a cash sweep programme",
+  commercial: "that it does commercial banking", alco: "that it has an ALCO", wealth: "that it has a wealth business",
+};
+
+// The fact the research couldn't confirm when a product is held at P3 by
+// "Unknown ≠ absent", in words a seller can check ("that it serves small businesses").
+export function unconfirmedGap(p: DashboardProduct): string | null {
+  const caps = Array.isArray(p.caps) ? p.caps : typeof p.caps === "string" ? p.caps.split(";") : [];
+  const cap = caps.map((c) => c.trim()).find((c) => /^unknown/i.test(c));
+  if (!cap) return null;
+  const facts = (cap.match(/unconfirmed (.+?) (?:--|—|-) capped/)?.[1] ?? "").split(/,\s*/).filter(Boolean);
+  return facts.map((f) => {
+    const branch = f.match(/branch count \(gate (\d+)\)/);
+    return branch ? `its branch count (${branch[1]}+ needed)` : GAP_WORDS[f] ?? f;
+  }).join(" and ") || "a required fact";
+}
 
 export function priority(p: DashboardProduct) {
   const n = Number(p.pri);
