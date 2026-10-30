@@ -95,6 +95,13 @@ Sellers record, for each bank and Curinos product, what the account team knows: 
 - **Home** shows a "Your whitespace" card; **product pages** show the product's status across your book and the team's pursuits; the **Ask** assistant reads it all through `get_whitespace`.
 - ACV accepts `250k`, `1.2m` or a bare number under 1,000, read as thousands.
 
+### Pursuits, conversions and engagement plans
+
+- **Home → "Q4 2026 pursuits"** (the current quarter): every validated or in-play pursuit in the seller's book targeted for this quarter, plus any overdue from earlier quarters, with the total value and days left. Managers can switch to their team's pursuits.
+- **Converting a pursuit**: each pursuit (Home tile, bank Whitespace page, the grid editor) has one-click moves: Validated → **Move to pipeline** / **Won** / **Lost** / **Not a fit**, In play → **Won** / **Lost**, and **Roll to next quarter**. A move opens the editor on the new status with the quarter and value filled in. **Won** sets the product to Current client and keeps the value as the value won.
+- **Whitespace → Conversion**: per quarter (this one and the four before), how many pursuits were newly validated, moved to pipeline, won and lost, with values, win rate (won ÷ won + lost) and average days from first validated to won; the team view splits it by seller (by whose book the bank is in). Built from `whitespace_events` by `conversions()` in `lib/whitespace.ts`. Setting an existing client directly is not counted as a win.
+- **Engagement plan** (`/banks/<slug>/plan/<product>`): one click asks Claude (the same model and API key as Ask) to write a one-page plan from the bank's dashboard, recent news, results calendar, the catalogue entry and the team's whitespace notes. Plans are saved in `engagement_plans` (every version kept, the latest shown, shared with all members), flagged when the dashboard has been refreshed since, and can be copied or downloaded for Word. Limit: `PLAN_DAILY_LIMIT` plans per person per 24 hours (default 20). Code: `lib/plan.ts`, `app/api/plan/route.ts`.
+
 ## Managers and team view
 
 - **Roles:** Pending, Seller, **Manager** (a seller who also gets a team view) and Admin (everything, including a team view). Set in Admin → People.

@@ -1,5 +1,5 @@
 import { PILLAR_ORDER, PRODUCTS, effectivePriority, productFor, type CatalogueProduct, type DashboardProduct } from "./products";
-import { LOST_WINDOW_MONTHS, STATUSES, STATUS_KEYS, addToPair, emptyPair, formatQuarter, formatUsd, lostExpired, monthsAgo, quarterOf, type Pair, type Status, type WhitespaceRow } from "./whitespace-core";
+import { LOST_WINDOW_MONTHS, STATUSES, addQuarters, STATUS_KEYS, addToPair, emptyPair, formatQuarter, formatUsd, lostExpired, monthsAgo, quarterOf, type Pair, type Status, type WhitespaceRow } from "./whitespace-core";
 
 export * from "./whitespace-core";
 
@@ -179,4 +179,58 @@ export function weeklyTrend(snaps: { week: string; status: string; acv_usd: numb
   const by = new Map<string, Pair>();
   for (const s of snaps) addToPair(by.get(s.week) ?? by.set(s.week, emptyPair()).get(s.week)!, s.status, s.acv_usd);
   return [...by.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([week, p]) => ({ week, ...p }));
+}
+
+// ---- Conversions: what happened to pursuits, quarter by quarter, from the history.
+// A win is a move from Validated or In play to Client; a loss is a move from a
+// pursuit to Lost (pipeline). Setting an existing client directly isn't a win.
+
+export type ConversionQuarter = {
+  quarter: string;
+  validated: number; validatedAcv: number; // newly validated
+  toPipeline: number; toPipelineAcv: number; // moved to In play
+  won: number; wonAcv: number;
+  lost: number; lostAcv: number;
+  dropped: number; // marked Not a fit
+  winRate: number | null; // won / (won + lost)
+  daysToWin: number | null; // average, first validated to won
+};
+
+const PURSUIT: (Status | null)[] = ["validated", "in_play"];
+
+export function conversions(events: WhitespaceEvent[], quarters = 5, today = new Date()): ConversionQuarter[] {
+  const keys = Array.from({ length: quarters }, (_, i) => addQuarters(quarterOf(today), i - quarters + 1));
+  const out = new Map(keys.map((q) => [q, {
+    quarter: q, validated: 0, validatedAcv: 0, toPipeline: 0, toPipelineAcv: 0, won: 0, wonAcv: 0,
+    lost: 0, lostAcv: 0, dropped: 0, winRate: null, daysToWin: null, days: [] as number[],
+  }]));
+  const firstValidated = new Map<string, number>();
+  for (const e of [...events].sort((a, b) => a.at.localeCompare(b.at))) {
+    const key = `${e.slug}|${e.product_slug}`;
+    const t = new Date(e.at).getTime();
+    if (e.new_status === "validated" && e.old_status !== "validated" && !firstValidated.has(key)) firstValidated.set(key, t);
+    if (e.old_status === e.new_status) continue;
+    const q = out.get(quarterOf(new Date(e.at)));
+    const acv = Number(e.new_acv ?? e.old_acv ?? 0);
+    const fromPursuit = PURSUIT.includes(e.old_status);
+    if (e.new_status === "validated") { if (q) { q.validated++; q.validatedAcv += acv; } }
+    else if (e.new_status === "in_play") { if (q) { q.toPipeline++; q.toPipelineAcv += acv; } }
+    else if (e.new_status === "client" && fromPursuit) {
+      if (q) {
+        q.won++; q.wonAcv += acv;
+        const start = firstValidated.get(key);
+        if (start != null) q.days.push((t - start) / 86400000);
+      }
+    } else if (e.new_status === "lost_pipeline" && fromPursuit) { if (q) { q.lost++; q.lostAcv += acv; } }
+    else if (e.new_status === "not_fit" && fromPursuit) { if (q) q.dropped++; }
+    if (e.new_status !== "validated" && e.new_status !== "in_play") firstValidated.delete(key);
+  }
+  return keys.map((k) => {
+    const { days, ...q } = out.get(k)!;
+    return {
+      ...q,
+      winRate: q.won + q.lost ? q.won / (q.won + q.lost) : null,
+      daysToWin: days.length ? Math.round(days.reduce((a, b) => a + b, 0) / days.length) : null,
+    };
+  });
 }

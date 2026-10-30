@@ -55,10 +55,13 @@ export async function saveWhitespace(_prev: SaveState, formData: FormData): Prom
   }
   const note = String(formData.get("note") ?? "").trim().slice(0, 500) || null;
 
+  // A win keeps its value (the ACV won), so conversions can be reported.
+  const { data: before } = await supabase.from("whitespace").select("status, acv_usd").eq("slug", slug).eq("product_slug", productSlug).maybeSingle();
+  const won = status === "client" && (before?.status === "validated" || before?.status === "in_play");
   const { error } = await supabase.from("whitespace").upsert({
     slug, product_slug: productSlug, status,
     target_quarter: pursuit ? quarter : null,
-    acv_usd: pursuit || window ? acv : null,
+    acv_usd: pursuit || window || won ? acv : status === "client" && before?.status === "client" ? before.acv_usd : null,
     lost_on: lostOn, note,
     updated_by: viewer.id, updated_at: new Date().toISOString(),
     is_demo: false, // a real edit makes the row real
@@ -66,6 +69,20 @@ export async function saveWhitespace(_prev: SaveState, formData: FormData): Prom
   if (error) return { error: error.message };
   revalidate(slug);
   return { saved: true };
+}
+
+// Keeps a pursuit going in a later quarter (from the Home pursuits tile).
+export async function rollQuarter(formData: FormData) {
+  const viewer = await requireViewer();
+  if (viewer.role === "pending") return;
+  const slug = String(formData.get("slug") ?? "");
+  const productSlug = String(formData.get("product") ?? "");
+  const quarter = String(formData.get("quarter") ?? "");
+  if (!quarterOptions(new Date(), 11).includes(quarter)) return;
+  const supabase = await createClient();
+  await supabase.from("whitespace").update({ target_quarter: quarter, updated_by: viewer.id, updated_at: new Date().toISOString(), is_demo: false })
+    .eq("slug", slug).eq("product_slug", productSlug).in("status", ["validated", "in_play"]);
+  revalidate(slug);
 }
 
 // Whitespace feeds Home, Products, the bank pages and the Whitespace views, so a

@@ -10,9 +10,10 @@ import { createClient } from "@/lib/supabase/server";
 import { WHITESPACE_COLUMNS, bookOf, formatQuarter, formatUsd, quarterOf, totals, type WhitespaceRow } from "@/lib/whitespace";
 import { loadTeam } from "@/lib/team";
 import { nextPlays } from "@/lib/plays";
-import { unconfirmedGap } from "@/lib/products";
+import { productBySlug, unconfirmedGap } from "@/lib/products";
 import type { InsightInput } from "@/lib/insights";
 import { PlayList } from "./plays";
+import { PursuitList, daysLeftInQuarter, isPursuit, type Pursuit } from "./pursuits";
 import { FollowButton } from "./follow-button";
 
 export const metadata: Metadata = { title: "Home" };
@@ -20,7 +21,8 @@ export const metadata: Metadata = { title: "Home" };
 type Summary = { slug: string; sales_theme: string | null; lead_products: string[]; researched_at: string };
 type News = { published_on: string; headline: string; url: string | null };
 
-export default async function HomePage() {
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ pursuits?: string }> }) {
+  const pursuitView = (await searchParams).pursuits === "team" ? "team" : "mine";
   const viewer = await requireViewer();
   const supabase = await createClient();
   const today = todayISO();
@@ -65,6 +67,26 @@ export default async function HomePage() {
     .filter((e) => needsRefresh(e, summary.get(e.slug)?.researched_at ?? null))
     .sort((a, b) => b.event_date.localeCompare(a.event_date));
   const firstName = viewer.fullName?.split(" ")[0];
+  // This quarter's pursuits (and any overdue from earlier quarters): the seller's
+  // book, or for a manager optionally the whole team's.
+  const thisQuarter = quarterOf(new Date());
+  const ownerOf = (slug: string) => team.filter((m) => m.id !== viewer.id && m.banks.includes(slug)).map((m) => m.name.split(" ")[0]).join(", ");
+  const showTeamPursuits = pursuitView === "team" && team.length > 1;
+  const pursuitRows = allWs
+    .filter((r) => isPursuit(r) && r.target_quarter && r.target_quarter <= thisQuarter)
+    .filter((r) => (showTeamPursuits ? teamSlugs.includes(r.slug) || booked.has(r.slug) : booked.has(r.slug)))
+    .sort((a, b) => (a.status === b.status ? 0 : a.status === "in_play" ? -1 : 1) || Number(b.acv_usd ?? 0) - Number(a.acv_usd ?? 0));
+  const { data: planRows } = pursuitRows.length
+    ? await supabase.from("engagement_plans").select("slug, product_slug").in("slug", [...new Set(pursuitRows.map((r) => r.slug))])
+    : { data: [] };
+  const planned = new Set((planRows ?? []).map((p) => `${p.slug}|${p.product_slug}`));
+  const pursuits: Pursuit[] = pursuitRows.map((r) => ({
+    row: r, bankName: bySlug.get(r.slug)?.name ?? r.slug, productName: productBySlug(r.product_slug)?.name ?? r.product_slug,
+    owner: showTeamPursuits ? ownerOf(r.slug) || undefined : undefined, hasPlan: planned.has(`${r.slug}|${r.product_slug}`),
+  }));
+  const pursuitAcv = pursuitRows.reduce((t, r) => t + Number(r.acv_usd ?? 0), 0);
+  const overdueCount = pursuitRows.filter((r) => r.target_quarter! < thisQuarter).length;
+
   const plays = nextPlays((research ?? []) as InsightInput[], allWs, 3);
   const playSource = wsSlugs.length ? "your book" : followed.size ? "the banks you follow" : "high-opportunity banks";
 
@@ -128,6 +150,33 @@ export default async function HomePage() {
           </nav>
         </div>
       </section>
+
+      {(bookBanks.length > 0 || team.length > 1) && (
+        <section className="panel pursuits-tile">
+          <div className="panel-head">
+            <div>
+              <h2>{formatQuarter(thisQuarter)} pursuits</h2>
+              <p className="pursuit-sum">
+                <b>{formatUsd(pursuitAcv) || "$0"}</b> across {pursuits.length} {pursuits.length === 1 ? "pursuit" : "pursuits"} · {daysLeftInQuarter()} days left in the quarter
+                {overdueCount > 0 && <span className="warn-text"> · {overdueCount} overdue from earlier quarters</span>}
+              </p>
+            </div>
+            {team.length > 1 && (
+              <nav className="view-switch" aria-label="Whose pursuits">
+                <Link href="/" className={!showTeamPursuits ? "active" : ""}>Mine</Link>
+                <Link href="/?pursuits=team" className={showTeamPursuits ? "active" : ""}>My team</Link>
+              </nav>
+            )}
+          </div>
+          {pursuits.length ? <PursuitList pursuits={pursuits} /> : (
+            <p className="dim">
+              Nothing validated or in play for {formatQuarter(thisQuarter)}. Pick from your next best plays above, or{" "}
+              <Link href="/whitespace">plan pursuits in Whitespace →</Link>
+            </p>
+          )}
+          <p className="dim small">Record every move with <b>Move to pipeline</b>, <b>Won</b> or <b>Lost</b> so it shows in <Link href="/whitespace#conversion">conversion reporting</Link>.</p>
+        </section>
+      )}
 
       {(bookBanks.length > 0 || teamTotals) && (
         <section className="panel">

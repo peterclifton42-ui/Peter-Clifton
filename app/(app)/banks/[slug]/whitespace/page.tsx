@@ -10,6 +10,7 @@ import {
 } from "@/lib/whitespace";
 import { EditTrigger, StatusPill, type EditorTarget } from "../../../whitespace/editor";
 import { BankBar, loadInstitution } from "../bank-bar";
+import { PursuitList, isPursuit } from "../../../pursuits";
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ all?: string }> };
 
@@ -30,14 +31,16 @@ export default async function BankWhitespacePage({ params, searchParams }: Props
   if (!institution?.current_snapshot_id) notFound();
 
   const supabase = await createClient();
-  const [{ data: snapshot }, { data: research }, { data: rows }, { data: events }, people] = await Promise.all([
+  const [{ data: snapshot }, { data: research }, { data: rows }, { data: events }, people, { data: plans }] = await Promise.all([
     supabase.from("snapshots").select("loaded_at").eq("id", institution.current_snapshot_id).single(),
     supabase.from("insight_inputs").select("products, dnr_products").eq("slug", slug).maybeSingle(),
     supabase.from("whitespace").select(WHITESPACE_COLUMNS).eq("slug", slug),
     supabase.from("whitespace_events").select(EVENT_COLUMNS).eq("slug", slug).order("at", { ascending: false }).limit(12),
     memberNames(),
+    supabase.from("engagement_plans").select("product_slug").eq("slug", slug),
   ]);
   if (!snapshot) notFound();
+  const planned = new Set((plans ?? []).map((p) => p.product_slug as string));
   const nameOf = people;
   const wsRows = (rows ?? []) as WhitespaceRow[];
   const lines = productLines(institution, research?.products ?? null, research?.dnr_products ?? null, wsRows);
@@ -74,6 +77,15 @@ export default async function BankWhitespacePage({ params, searchParams }: Props
           <div className="stat"><b>{reviewed}/{applicable.length}</b><span>applicable products reviewed</span></div>
           <div className="stat"><b>{t.lost}</b><span>recently lost (avoid for now)</span></div>
         </div>
+
+        {wsRows.some(isPursuit) && (
+          <section className="panel">
+            <h2>Pursuits</h2>
+            <PursuitList showBank={false} pursuits={wsRows.filter(isPursuit)
+              .sort((a, b) => (a.target_quarter ?? "9").localeCompare(b.target_quarter ?? "9"))
+              .map((r) => ({ row: r, bankName: institution.name, productName: productName.get(r.product_slug) ?? r.product_slug, hasPlan: planned.has(r.product_slug) }))} />
+          </section>
+        )}
 
         {PILLAR_ORDER.map((pillar) => {
           const group = lines.filter((l) => l.product.pillar === pillar && (showAll || l.applies.ok));
