@@ -942,3 +942,43 @@ details.about[open] > summary::after { content: "Hide ▴"; }
 .check-list h3 { margin: 0 0 4px; }
 .check-list ul { margin: 8px 0 0; display: grid; gap: 6px; font-size: 13.5px; }
 ul.todo li.todo-check { border-left-color: var(--warn); }
+
+/* ---------- Pursuits (Home tile, bank whitespace) and conversions ---------- */
+.pursuits-tile .panel-head { align-items: flex-start; }
+.pursuit-sum { margin: 4px 0 0; color: var(--muted); }
+.pursuit-sum b { color: var(--text-strong); font-size: 18px; }
+ul.pursuits { list-style: none; margin: 10px 0; padding: 0; display: grid; gap: 8px; }
+.pursuit { display: flex; gap: 12px; justify-content: space-between; align-items: center; flex-wrap: wrap; padding: 10px 12px; border-radius: 8px; background: var(--bg); border-left: 3px solid var(--ws-validated); }
+.pursuit.pursuit-in_play { border-left-color: var(--ws-in_play); }
+.pursuit-main { min-width: 0; flex: 1 1 320px; display: grid; gap: 4px; }
+.pursuit-head { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.pursuit-acv { color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.pursuit-note { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pursuit-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; }
+.plan-btn { font-size: 13px; padding: 5px 12px; }
+.convert { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.convert form { display: contents; }
+button.convert-btn { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px; background: transparent; color: var(--text); border: 1px solid var(--border); }
+button.convert-btn:hover { background: var(--surface-2); }
+button.convert-in_play { color: #6fe0b5; border-color: color-mix(in srgb, var(--ws-in_play) 60%, transparent); }
+button.convert-client { color: #f59ac0; border-color: color-mix(in srgb, var(--ws-client) 60%, transparent); }
+button.convert-lost_pipeline { color: #ffab85; border-color: color-mix(in srgb, var(--ws-lost_pipeline) 50%, transparent); }
+button.convert-not_fit, button.convert-roll { color: var(--muted); }
+.ws-converting { display: block; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--accent-text); margin-bottom: 2px; }
+.conv-table tbody th { text-align: left; font-weight: 600; white-space: nowrap; text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--text-strong); }
+.conv-table .dim { font-size: 12px; }
+.won-text { color: #f59ac0; }
+#conversion h3 { margin: 16px 0 6px; font-size: 14px; }
+
+/* Engagement plan */
+.plan-page .crumbs { margin: 0 0 6px; font-size: 13px; color: var(--muted); }
+.plan-bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 12px; }
+.plan-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.plan-body { max-width: 860px; line-height: 1.6; }
+.plan-body h2 { font-size: 17px; margin: 20px 0 6px; }
+.plan-body h2:first-child { margin-top: 0; }
+.plan-body ul, .plan-body ol { padding-left: 22px; }
+.plan-body li { margin: 3px 0; }
+@media print {
+  .topbar, .plan-bar, .crumbs, .convert { display: none !important; }
+}

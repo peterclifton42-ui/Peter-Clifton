@@ -7,7 +7,7 @@ import { PILLAR_ORDER, PRODUCTS, productBySlug } from "@/lib/products";
 import { memberNames } from "@/lib/people";
 import { createClient } from "@/lib/supabase/server";
 import {
-  EVENT_COLUMNS, STATUSES, STATUS_KEYS, WHITESPACE_COLUMNS, addToPair, bookOf, emptyPair, lostExpired, describeChange, formatQuarter, formatUsd, quarterOf, totals, weeklyTrend,
+  EVENT_COLUMNS, STATUSES, STATUS_KEYS, WHITESPACE_COLUMNS, addQuarters, addToPair, bookOf, conversions, quarterStart, emptyPair, lostExpired, describeChange, formatQuarter, formatUsd, quarterOf, totals, weeklyTrend,
   type Institution, type ProductLine, type WhitespaceEvent, type WhitespaceRow,
 } from "@/lib/whitespace";
 import { Legend, QuarterColumns, RowBars, TrendLines } from "./charts";
@@ -50,7 +50,9 @@ export default async function WhitespacePage({ searchParams }: { searchParams: P
     return qs({ sellers: next.length && next.length < members.length ? next.join(",") : null });
   };
   const since = new Date(Date.now() - 30 * 86400 * 1000).toISOString();
-  const [{ data: insts }, { data: research }, { data: rows }, { data: snaps }, { data: events }, people] = followed.length
+  // Conversions look back over this quarter and the four before it.
+  const historyFrom = quarterStart(addQuarters(quarterOf(new Date()), -4));
+  const [{ data: insts }, { data: research }, { data: rows }, { data: snaps }, { data: events }, people, { data: history }] = followed.length
     ? await Promise.all([
       supabase.from("institutions").select("slug, name, category, assets_b").in("slug", followed),
       supabase.from("insight_inputs").select("slug, products, dnr_products").in("slug", followed),
@@ -58,8 +60,9 @@ export default async function WhitespacePage({ searchParams }: { searchParams: P
       supabase.from("whitespace_snapshots").select("week, status, acv_usd").in("slug", followed).in("status", ["validated", "in_play"]),
       supabase.from("whitespace_events").select(EVENT_COLUMNS).in("slug", followed).gte("at", since).order("at", { ascending: false }).limit(200),
       memberNames(),
+      supabase.from("whitespace_events").select(EVENT_COLUMNS).in("slug", followed).gte("at", historyFrom).order("at").limit(5000),
     ])
-    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }, new Map<string, string>()];
+    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }, new Map<string, string>(), { data: [] }];
 
   const wsRows = (rows ?? []) as WhitespaceRow[];
   const book = bookOf({ institutions: (insts ?? []) as Institution[], research: (research ?? []) as never, rows: wsRows });
@@ -90,6 +93,17 @@ export default async function WhitespacePage({ searchParams }: { searchParams: P
     const last = [...wsRows.filter((r) => r.updated_by === m.id).map((r) => r.updated_at), ...mine.map((e) => e.at)].sort().pop();
     return { m, pair, banks: m.banks.length, reviewedPct: lines.length ? Math.round((reviewed / lines.length) * 100) : 0, changes: mine.length, last };
   });
+  const allHistory = (history ?? []) as WhitespaceEvent[];
+  const funnel = conversions(allHistory);
+  const funnelTotal = funnel.reduce((a, q) => ({ won: a.won + q.won, lost: a.lost + q.lost, wonAcv: a.wonAcv + q.wonAcv }), { won: 0, lost: 0, wonAcv: 0 });
+  // Per seller over the same five quarters, by whose book the bank is in.
+  const sellerFunnel = teamView ? shown.map((m) => {
+    const qs5 = conversions(allHistory.filter((e) => m.banks.includes(e.slug)));
+    const sum = (k: "validated" | "toPipeline" | "won" | "wonAcv" | "lost") => qs5.reduce((a, q) => a + q[k], 0);
+    const won = sum("won"), lost = sum("lost");
+    return { m, validated: sum("validated"), toPipeline: sum("toPipeline"), won, wonAcv: sum("wonAcv"), lost, winRate: won + lost ? won / (won + lost) : null };
+  }) : [];
+  const pctOf = (r: number | null) => (r == null ? "–" : `${Math.round(r * 100)}%`);
   const moved = {
     validated: recent.filter((e) => e.new_status === "validated" && e.old_status !== "validated").length,
     inPlay: recent.filter((e) => e.new_status === "in_play" && e.old_status !== "in_play").length,
@@ -250,6 +264,62 @@ export default async function WhitespacePage({ searchParams }: { searchParams: P
               </ul>
             </section>
           </div>
+
+          <section className="panel" id="conversion">
+            <div className="panel-head">
+              <h2>Conversion</h2>
+              <span className="dim">
+                Last 5 quarters: {funnelTotal.won} won{funnelTotal.wonAcv ? ` (${formatUsd(funnelTotal.wonAcv)})` : ""} · {funnelTotal.lost} lost
+                {funnelTotal.won + funnelTotal.lost ? ` · ${pctOf(funnelTotal.won / (funnelTotal.won + funnelTotal.lost))} win rate` : ""}
+              </span>
+            </div>
+            <p className="dim">What happened to pursuits each quarter, from every status change. Use <b>Move to pipeline</b>, <b>Won</b> or <b>Lost</b> on a pursuit to record it.</p>
+            <div className="table-wrap flat">
+              <table className="conv-table">
+                <thead>
+                  <tr><th>Quarter</th><th className="num">Validated</th><th className="num">Moved to pipeline</th><th className="num">Won</th><th className="num">Value won</th><th className="num">Lost</th><th className="num">Value lost</th><th className="num">Win rate</th><th className="num">Days to win</th></tr>
+                </thead>
+                <tbody>
+                  {[...funnel].reverse().map((q) => (
+                    <tr key={q.quarter}>
+                      <th scope="row">{formatQuarter(q.quarter)}{q.quarter === quarterOf(new Date()) ? " (now)" : ""}</th>
+                      <td className="num">{q.validated || "–"}{q.validatedAcv ? <span className="dim"> {formatUsd(q.validatedAcv)}</span> : null}</td>
+                      <td className="num">{q.toPipeline || "–"}{q.toPipelineAcv ? <span className="dim"> {formatUsd(q.toPipelineAcv)}</span> : null}</td>
+                      <td className="num"><b className={q.won ? "won-text" : ""}>{q.won || "–"}</b></td>
+                      <td className="num">{q.wonAcv ? formatUsd(q.wonAcv) : "–"}</td>
+                      <td className="num">{q.lost || "–"}</td>
+                      <td className="num">{q.lostAcv ? formatUsd(q.lostAcv) : "–"}</td>
+                      <td className="num">{pctOf(q.winRate)}</td>
+                      <td className="num">{q.daysToWin ?? "–"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {teamView && sellerFunnel.length > 1 && (
+              <>
+                <h3>By seller (last 5 quarters)</h3>
+                <div className="table-wrap flat">
+                  <table className="conv-table">
+                    <thead><tr><th>Seller</th><th className="num">Validated</th><th className="num">Moved to pipeline</th><th className="num">Won</th><th className="num">Value won</th><th className="num">Lost</th><th className="num">Win rate</th></tr></thead>
+                    <tbody>
+                      {sellerFunnel.map((r) => (
+                        <tr key={r.m.id}>
+                          <td><Link href={qs({ sellers: r.m.id })}>{r.m.name}</Link></td>
+                          <td className="num">{r.validated || "–"}</td>
+                          <td className="num">{r.toPipeline || "–"}</td>
+                          <td className="num">{r.won || "–"}</td>
+                          <td className="num">{r.wonAcv ? formatUsd(r.wonAcv) : "–"}</td>
+                          <td className="num">{r.lost || "–"}</td>
+                          <td className="num">{pctOf(r.winRate)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </section>
 
           <div className="ws-dash">
             <section className="panel">

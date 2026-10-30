@@ -32,6 +32,14 @@ export function addQuarters(q: string, n: number) {
   const i = y * 4 + (k - 1) + n;
   return `${Math.floor(i / 4)}-Q${(i % 4) + 1}`;
 }
+// First and last day of a quarter, as ISO dates.
+export function quarterStart(q: string) {
+  return `${q.slice(0, 4)}-${String((Number(q.slice(6)) - 1) * 3 + 1).padStart(2, "0")}-01`;
+}
+export function quarterEnd(q: string) {
+  const y = Number(q.slice(0, 4)), k = Number(q.slice(6));
+  return new Date(Date.UTC(y, k * 3, 0)).toISOString().slice(0, 10);
+}
 export function quarterOptions(today = new Date(), ahead = 7) {
   const now = quarterOf(today);
   return Array.from({ length: ahead + 1 }, (_, i) => addQuarters(now, i));
@@ -77,3 +85,17 @@ export function addToPair(p: Pair, status: string, acv: number | null) {
   if (status === "in_play") { p.inPlay += Number(acv ?? 0); p.ipCount++; }
   return p;
 }
+
+// ---- Converting a pursuit: the moves offered on each pursuit, in order.
+export const CONVERSIONS: Partial<Record<Status, { to: Status; label: string }[]>> = {
+  validated: [
+    { to: "in_play", label: "Move to pipeline" },
+    { to: "client", label: "Won" },
+    { to: "lost_pipeline", label: "Lost" },
+    { to: "not_fit", label: "Not a fit" },
+  ],
+  in_play: [
+    { to: "client", label: "Won" },
+    { to: "lost_pipeline", label: "Lost" },
+  ],
+};
