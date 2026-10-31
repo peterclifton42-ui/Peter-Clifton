@@ -1,6 +1,6 @@
 # Refresh task — research one institution and publish its new dashboard
 
-Runs unattended twice a day (scheduled task "Bank Intelligence — refresh one dashboard"). Fresh session: decide everything yourself and never ask questions. This replaces the old Run A / Run B pair. The research half is Run A's routine, unchanged. The publish half is now a single command, and there is no email to Curinos: the app is the delivery.
+Runs unattended every two hours (scheduled task "Bank Intelligence — refresh one dashboard"), so earnings-season backlogs clear in a day or two; when nothing is due it exits in a minute. Fresh session: decide everything yourself and never ask questions. This replaces the old Run A / Run B pair. The research half is Run A's routine, unchanged. The publish half is now a single command, and there is no email to Curinos: the app is the delivery.
 
 Repository: `/home/user/Peter-Clifton` (if it is missing, `git clone https://github.com/peterclifton42-ui/Peter-Clifton` there). Database: the Supabase project `bank-intelligence`, reached only through `python3 pipeline/db.py …` (and `pipeline/publish.py`). Both use the `SUPABASE_SECRET_KEY` environment variable. Run `python3 pipeline/db.py check` first: if it says the key is not set, stop and report exactly that.
 
@@ -11,7 +11,7 @@ Repository: `/home/user/Peter-Clifton` (if it is missing, `git clone https://git
 ## Step 0 — Set up and guard
 
 1. `cd /home/user/Peter-Clifton && git pull -q origin main && python3 pipeline/db.py check`.
-2. Run `date -u`. You fire at 00:07 and 12:07 UTC. If it is more than 6 hours past your slot, you are a stalled session that resumed late: do nothing and stop.
+2. Run `date -u`. You fire every two hours at 7 minutes past (00:07, 02:07, … 22:07 UTC). If it is more than 90 minutes past the latest of those slots, you are a stalled session that resumed late: do nothing and stop.
 3. Make a working folder, `mkdir -p /tmp/refresh && cd /tmp/refresh`, and copy into it:
    - `reference/score_v4.py`
    - `reference/claude/bank-benchmark-2026Q2.json`. Use a newer `bank-benchmark-*.json` instead if `reference/claude/` has one. Keep the file name; the scorer finds it by that name.
@@ -34,7 +34,7 @@ python3 pipeline/db.py queue
 
 The queue lists institutions whose latest published results are newer than their dashboard, plus any institution a seller asked to refresh (the "Request full refresh" button, which works on any bank). Requested ones come first, then most-followed, then oldest results first. A requested bank may already have its latest results in the dashboard: research it fully anyway, using the latest reported quarter (`period` may be empty if no results are recorded; then use the latest quarter you can source). It leaves out anything another run claimed in the last 6 hours. Take the **first** entry.
 
-- **Empty list:** run `python3 pipeline/db.py start refresh "Queue empty"`, then `python3 pipeline/db.py finish <run id> skipped "Queue empty: every dashboard is current"`, and stop. That is a correct outcome.
+- **Empty list:** don't record a run. Instead catch up on seller summaries: run `python3 pipeline/db.py briefs-due 3` and, for each institution it lists, write its summary by following `pipeline/BRIEF.md` with trigger `backfill` (no web calls; everything comes from `brief-context`). Then stop, with a one-line summary such as "Queue empty; wrote 3 summaries". If `briefs-due` is empty too, just stop: that is a correct outcome.
 - **Otherwise, claim it:** `python3 pipeline/db.py start refresh <slug> "Researching <period> results"`. Keep the printed `run_id` as the RUN ID.
 
 To see what the institution is: `python3 pipeline/db.py institution <slug>`. Keep the same slug; the app tracks it by that.
@@ -61,8 +61,8 @@ A web call is one WebSearch or one WebFetch. Count them as you go.
 | Phase | Calls | Rule |
 |---|---|---|
 | Registry lookup | 1–2, mandatory | FDIC BankFind for the operating bank (or the NCUA charter for a credit union). Start with WebSearch: `site:fdic.gov bankfind "[legal name]"`, then fetch the details page. Fills `basic.fdic`, `structure.bank.fdic`, `structure.bank.rssd`, `basic.rssd`/`structure.parent.rssd`, `basic.employees` and `basic.est` |
-| Subject research | 20–24 | The source checklist below, in order. Move to peers by call 28 at the latest |
-| Peers | at least 8, reserved | 4 peers × (same-quarter release + one follow-up for a missing metric). Three fully sourced peers beat four half-empty ones. **Choose them from the bank's own disclosed peer group first** (item 6), picking the closest in size and business model; only fill gaps with your own judgement, and say which you used in `peers.salesAngle` |
+| Subject research | 24–28 | The source checklist below, in order. Move to peers by call 32 at the latest (call 28 for a credit union) |
+| Peers | 4 for a bank, 8 for a credit union, reserved | **Banks: 2 peers** × (same-quarter release + one follow-up). The app compares every bank with its official peer group on call report figures (Compare and the Summary page), so the hand-sourced peers now only supply what the call reports don't: loan yield, deposits per branch and service charges, which the scorer needs. **Credit unions: 4 peers** as before, since there is no official peer data for them. **Choose peers from the bank's own disclosed peer group first** (item 6), the closest in size and business model, and say which you used in `peers.salesAngle` |
 | Completeness pass | up to 5 | Only on what `check_completeness.py` reports as FAIL |
 
 **Source checklist (subject):**
@@ -134,6 +134,10 @@ cd /home/user/Peter-Clifton && python3 pipeline/publish.py /tmp/refresh/intel.js
 ```
 
 It repeats every check, then uploads. It must print `PUBLISHED — <slug> is live as snapshot <id>`.
+
+### Step 7b — Write the seller summary
+
+Follow `pipeline/BRIEF.md` with trigger `refresh`. It takes a few minutes and no web calls: the summary is written from the dashboard you just published, the official figures, the news and the team's whitespace. If `set-brief` refuses it, fix what it says and save again; a failed summary never undoes the publish (note it in the finish line instead).
 
 ## Step 8 — Close the run
 

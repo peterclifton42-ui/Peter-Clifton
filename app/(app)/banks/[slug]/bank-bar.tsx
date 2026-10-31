@@ -21,10 +21,10 @@ export const loadInstitution = cache(async (slug: string) => {
   return data as BankInstitution | null;
 });
 
-// The toolbar above every view of an institution: Dashboard | Whitespace, the
+// The toolbar above every view of an institution: Summary | Full report | Whitespace, the
 // research status, links and actions.
 export async function BankBar({ institution, researchedAt, view }: {
-  institution: BankInstitution; researchedAt: string; view: "dashboard" | "whitespace";
+  institution: BankInstitution; researchedAt: string; view: "summary" | "report" | "whitespace";
 }) {
   const slug = institution.slug;
   const viewer = await requireViewer();
@@ -52,7 +52,8 @@ export async function BankBar({ institution, researchedAt, view }: {
     <div className="bank-bar">
       <Link href="/banks" className="back">← Banks</Link>
       <nav className="view-switch" aria-label="View">
-        <Link href={`/banks/${slug}`} className={view === "dashboard" ? "active" : ""} aria-current={view === "dashboard" ? "page" : undefined}>Dashboard</Link>
+        <Link href={`/banks/${slug}`} className={view === "summary" ? "active" : ""} aria-current={view === "summary" ? "page" : undefined}>Summary</Link>
+        <Link href={`/banks/${slug}/report`} className={view === "report" ? "active" : ""} aria-current={view === "report" ? "page" : undefined}>Full report</Link>
         <Link href={`/banks/${slug}/whitespace`} className={view === "whitespace" ? "active" : ""} aria-current={view === "whitespace" ? "page" : undefined}>Whitespace</Link>
       </nav>
       <span className="meta">
