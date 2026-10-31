@@ -9,6 +9,7 @@ import { PRODUCTS, effectivePriority, productFor, type DashboardProduct } from "
 import { createClient } from "@/lib/supabase/server";
 import { WHITESPACE_COLUMNS, formatQuarter, formatUsd, type WhitespaceRow } from "@/lib/whitespace";
 import { StatusPill } from "../../whitespace/editor";
+import { ClayDownload } from "../../clay-download";
 import { BankBar, loadInstitution } from "./bank-bar";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -232,7 +233,7 @@ export default async function BankSummaryPage({ params }: Props) {
                 </ul>
               ) : <p className="dim">No named contacts in the research yet.</p>}
               <p className="dim small sum-clay">
-                Find the rest of the buying group: <a href={`/api/clay?bank=${slug}`} download>download for Clay</a> (the personas for this bank&apos;s priority 1–2 products, with its website domain).
+                Find the rest of the buying group: <ClayDownload href={`/api/clay?bank=${slug}`}>download for Clay</ClayDownload> (the personas for this bank&apos;s priority 1–2 products, with its website domain).
               </p>
             </section>
           </div>
