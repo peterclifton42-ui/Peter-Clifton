@@ -104,40 +104,75 @@ export default async function BankSummaryPage({ params }: Props) {
         </div>
 
         <div className="sum-grid">
-          <section className="panel sum-situation">
-            <div className="panel-head">
-              <h2>The situation now</h2>
-              <span className="dim small">
-                {brief
-                  ? <>Updated {formatDay(brief.written_at.slice(0, 10))}{brief.trigger === "news" ? " after news" : brief.trigger === "refresh" ? ` with ${institution.latest_quarter ? quarterName(institution.latest_quarter) : "the latest"} results` : ""}</>
-                  : <>From the research of {formatDay(s.loaded_at.slice(0, 10))}</>}
-              </span>
-            </div>
-            {brief ? brief.situation.split(/\n+/).map((p, i) => <p key={i}>{p}</p>)
-              : fallback?.body ? <p>{fallback.body}</p> : <p className="dim">The summary is written at the next refresh.</p>}
-            {brief && !briefCurrent && <p className="dim small">The full report has been refreshed since; this summary updates on the next run.</p>}
+          <div className="sum-col">
+            <section className="panel sum-situation">
+              <div className="panel-head">
+                <h2>The situation now</h2>
+                <span className="dim small">
+                  {brief
+                    ? <>Updated {formatDay(brief.written_at.slice(0, 10))}{brief.trigger === "news" ? " after news" : brief.trigger === "refresh" ? ` with ${institution.latest_quarter ? quarterName(institution.latest_quarter) : "the latest"} results` : ""}</>
+                    : <>From the research of {formatDay(s.loaded_at.slice(0, 10))}</>}
+                </span>
+              </div>
+              {brief ? brief.situation.split(/\n+/).map((p, i) => <p key={i}>{p}</p>)
+                : fallback?.body ? <p>{fallback.body}</p> : <p className="dim">The summary is written at the next refresh.</p>}
+              {brief && !briefCurrent && <p className="dim small">The full report has been refreshed since; this summary updates on the next run.</p>}
 
-            <h2 className="sum-do-head">Three things to do now</h2>
-            {brief?.actions?.length ? (
-              <ol className="sum-actions">
-                {brief.actions.slice(0, 3).map((a, i) => (
-                  <li key={i}>
-                    <b>{a.title}</b>
-                    <p>{a.why}</p>
-                    <Link href={reportHref(slug, a.tab, a.at)}>{a.tab ? `See ${a.tab} in the full report →` : "Open the full report →"}</Link>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <ol className="sum-actions">
-                {plays[0] && <li><b>Open with {plays[0].product.name}</b><p>{plays[0].dp.why ?? "The research's top-rated product here."}</p><Link href={reportHref(slug, "Product Fit & Playbook", "pp-plan")}>See the playbook in the full report →</Link></li>}
-                {contacts[0] && <li><b>Get time with {contacts[0].name}</b><p>{contacts[0].insight ?? contacts[0].relevance}</p><Link href={reportHref(slug, "Organisation & People", "op-leadership")}>See leadership in the full report →</Link></li>}
-                <li><b>Review where the bank stands</b><p>Check the latest figures against peers before the call.</p><Link href={compareHref}>Compare with peers →</Link></li>
-              </ol>
-            )}
-          </section>
-
-          <div className="sum-side">
+              <h2 className="sum-do-head">Three things to do now</h2>
+              {brief?.actions?.length ? (
+                <ol className="sum-actions">
+                  {brief.actions.slice(0, 3).map((a, i) => (
+                    <li key={i}>
+                      <b>{a.title}</b>
+                      <p>{a.why}</p>
+                      <Link href={reportHref(slug, a.tab, a.at)}>{a.tab ? `See ${a.tab} in the full report →` : "Open the full report →"}</Link>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <ol className="sum-actions">
+                  {plays[0] && <li><b>Open with {plays[0].product.name}</b><p>{plays[0].dp.why ?? "The research's top-rated product here."}</p><Link href={reportHref(slug, "Product Fit & Playbook", "pp-plan")}>See the playbook in the full report →</Link></li>}
+                  {contacts[0] && <li><b>Get time with {contacts[0].name}</b><p>{contacts[0].insight ?? contacts[0].relevance}</p><Link href={reportHref(slug, "Organisation & People", "op-leadership")}>See leadership in the full report →</Link></li>}
+                  <li><b>Review where the bank stands</b><p>Check the latest figures against peers before the call.</p><Link href={compareHref}>Compare with peers →</Link></li>
+                </ol>
+              )}
+            </section>
+            <section className="panel">
+              <div className="panel-head">
+                <h2>Best plays here</h2>
+                <Link href={`/banks/${slug}/whitespace`}>Whitespace →</Link>
+              </div>
+              {pursuits.length > 0 && (
+                <div className="sum-pursuits">
+                  <span className="dim small">Active pursuits</span>
+                  {pursuits.map((r) => (
+                    <span key={r.product_slug} className={`sum-chip ws-${r.status}`}>
+                      {PRODUCTS.find((p) => p.slug === r.product_slug)?.name.replace(/^Advisory: /, "") ?? r.product_slug}
+                      {r.target_quarter && <em>{formatQuarter(r.target_quarter)}{r.acv_usd ? ` · ${formatUsd(r.acv_usd)}` : ""}</em>}
+                    </span>
+                  ))}
+                </div>
+              )}
+            {clientOf.length > 0 && <p className="dim small">Already a client for {clientOf.join(", ")}.</p>}
+              {plays.length ? (
+                <ul className="sum-plays">
+                  {plays.map(({ product, dp, pri }) => (
+                    <li key={product.slug}>
+                      <div>
+                        <Link href={`/products/${product.slug}`} className="play-product">{product.name}</Link>
+                        <span className={`badge pri-${pri}`}>P{pri}</span>
+                        {dp.fit != null && <span className="dim small">fit {dp.fit}</span>}
+                        <StatusPill status={statusOf.get(product.slug)?.status ?? null} />
+                      </div>
+                      {dp.why && <p className="dim">{dp.why}</p>}
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="dim">The research rates no product priority 1 or 2 here right now.</p>}
+              <Link href={reportHref(slug, "Product Fit & Playbook")}>Full product fit and playbook →</Link>
+            </section>
+          </div>
+          <div className="sum-col">
             <section className="panel">
               <div className="panel-head">
                 <h2>Key numbers</h2>
@@ -181,56 +216,23 @@ export default async function BankSummaryPage({ params }: Props) {
                 <li><span className="dim">Research</span> {formatDay(s.loaded_at.slice(0, 10))} · {(versions?.length ?? 0) > 1 ? <Link href={`/banks/${slug}/changes`}>What changed</Link> : "first version"}</li>
               </ul>
             </section>
+            <section className="panel sum-who">
+              <div className="panel-head">
+                <h2>Who to call</h2>
+                <Link href={reportHref(slug, "Organisation & People", "op-leadership")}>All leadership →</Link>
+              </div>
+              {contacts.length ? (
+                <ul className="sum-people">
+                  {contacts.map((c) => (
+                    <li key={c.name}>
+                      <b>{c.name}</b> <span className="dim">{c.title ?? c.badge}</span>
+                      {(c.insight || c.relevance) && <p>{c.insight ?? c.relevance}</p>}
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="dim">No named contacts in the research yet.</p>}
+            </section>
           </div>
-        </div>
-
-        <div className="sum-grid even">
-          <section className="panel">
-            <div className="panel-head">
-              <h2>Best plays here</h2>
-              <Link href={`/banks/${slug}/whitespace`}>Whitespace →</Link>
-            </div>
-            {pursuits.length > 0 && (
-              <p className="sum-pursuits">
-                {pursuits.length} active {pursuits.length === 1 ? "pursuit" : "pursuits"}:{" "}
-                {pursuits.map((r) => `${PRODUCTS.find((p) => p.slug === r.product_slug)?.name ?? r.product_slug}${r.target_quarter ? ` (${formatQuarter(r.target_quarter)}${r.acv_usd ? `, ${formatUsd(r.acv_usd)}` : ""})` : ""}`).join("; ")}
-              </p>
-            )}
-            {clientOf.length > 0 && <p className="dim small">Already a client for {clientOf.join(", ")}.</p>}
-            {plays.length ? (
-              <ul className="sum-plays">
-                {plays.map(({ product, dp, pri }) => (
-                  <li key={product.slug}>
-                    <div>
-                      <Link href={`/products/${product.slug}`} className="play-product">{product.name}</Link>
-                      <span className={`badge pri-${pri}`}>P{pri}</span>
-                      {dp.fit != null && <span className="dim small">fit {dp.fit}</span>}
-                      <StatusPill status={statusOf.get(product.slug)?.status ?? null} />
-                    </div>
-                    {dp.why && <p className="dim">{dp.why}</p>}
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="dim">The research rates no product priority 1 or 2 here right now.</p>}
-            <Link href={reportHref(slug, "Product Fit & Playbook")}>Full product fit and playbook →</Link>
-          </section>
-
-          <section className="panel">
-            <div className="panel-head">
-              <h2>Who to call</h2>
-              <Link href={reportHref(slug, "Organisation & People", "op-leadership")}>All leadership →</Link>
-            </div>
-            {contacts.length ? (
-              <ul className="sum-people">
-                {contacts.map((c) => (
-                  <li key={c.name}>
-                    <b>{c.name}</b> <span className="dim">{c.title ?? c.badge}</span>
-                    {(c.insight || c.relevance) && <p>{c.insight ?? c.relevance}</p>}
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="dim">No named contacts in the research yet.</p>}
-          </section>
         </div>
 
         <section className="panel">
