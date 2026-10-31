@@ -1,3 +1,4 @@
+import { ClayDownload } from "../../clay-download";
 import { ROLE_HELP, ROLE_LABEL, ROLES, personasFor } from "@/lib/personas";
 
 // "Who to target" on a product page: the roles in a deal and, for each persona,
@@ -18,9 +19,9 @@ export function WhoToTarget({ productSlug, productName }: { productSlug: string;
         </div>
         <div className="clay-export">
           <span className="dim small">Download for Clay</span>
-          <a className="button" href={href("targets")} download>Priority 1–2 targets</a>
-          <a className="button secondary" href={href("book")} download>Your book</a>
-          <a className="button secondary" href={href("all")} download>Every institution it fits</a>
+          <ClayDownload className="button" href={href("targets")}>Priority 1–2 targets</ClayDownload>
+          <ClayDownload className="button secondary" href={href("book")}>Your book</ClayDownload>
+          <ClayDownload className="button secondary" href={href("all")}>Every institution it fits</ClayDownload>
         </div>
       </div>
       {map.note && <p className="ws-hint">{map.note}</p>}

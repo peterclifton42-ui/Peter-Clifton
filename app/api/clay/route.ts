@@ -52,7 +52,9 @@ export async function GET(request: NextRequest) {
     db.from("whitespace").select(WHITESPACE_COLUMNS),
   ]);
   const institutions = (insts ?? []) as Inst[];
-  if (!institutions.length) return NextResponse.json({ error: "No institutions to export." }, { status: 404 });
+  if (!institutions.length) {
+    return NextResponse.json({ error: scope === "book" && !bankSlug ? "Your book is empty: mark banks as My account on their page first." : "No institutions to export." }, { status: 404 });
+  }
   const { data: snaps } = await db.from("snapshots")
     .select("id, website:data->basic->website, execs:data->contacts->execs")
     .in("id", institutions.map((i) => i.current_snapshot_id!));
