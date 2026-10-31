@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { MODEL } from "./ask/agent";
 import { EVENT_COLUMNS as CAL_COLUMNS, todayISO } from "./earnings";
+import { ROLE_LABEL, personasFor } from "./personas";
 import { productBySlug, productFor, statusLabel, type CatalogueProduct } from "./products";
 import { STATUSES, WHITESPACE_COLUMNS, formatQuarter, formatUsd, quarterOf, type WhitespaceRow } from "./whitespace";
 
@@ -84,6 +85,7 @@ export async function planInput(db: SupabaseClient, slug: string, productSlug: s
     `Today is ${todayISO()}. Write the engagement plan for **${product.name}** at **${inst.name}** (${inst.category === "credit_union" ? "credit union" : "bank"}, $${inst.assets_b}B assets).`,
     `Pursuit: ${row ? `${STATUSES[row.status].label}` : "not yet in whitespace"}; target quarter ${formatQuarter(quarter)}${row?.acv_usd ? `; value ${formatUsd(row.acv_usd)} ACV` : ""}${row?.note ? `; team note: "${row.note}"` : ""}.`,
     account.length ? `Other products at this account (whitespace): ${account.join("; ")}.` : "",
+    personaBlock(product.slug, inst.category === "credit_union"),
     `<catalogue product="${product.name}" status="${statusLabel(product)?.label ?? "available"}">\n${product.body.slice(0, 12_000)}\n</catalogue>`,
     `<product_card>\n${card ? JSON.stringify(cardText) : "The research has no card for this product."}\n</product_card>`,
     `<calendar>\n${JSON.stringify(cal ?? [])}\n</calendar>`,
@@ -91,6 +93,14 @@ export async function planInput(db: SupabaseClient, slug: string, productSlug: s
     `<research>\n${researchText.length > MAX_CONTEXT ? `${researchText.slice(0, MAX_CONTEXT)}…` : researchText}\n</research>`,
   ].filter(Boolean).join("\n\n");
   return { system: SYSTEM, prompt, product, bankName: inst.name };
+}
+
+// The roles in a deal for this product, so "Who to engage" covers the whole buying group.
+function personaBlock(productSlug: string, cu: boolean) {
+  const map = personasFor(productSlug);
+  if (!map) return "";
+  const lines = map.lines.map((l) => `- ${ROLE_LABEL[l.role]}: ${l.persona.label} (typical titles: ${(cu ? l.persona.cuTitles : l.persona.titles).join("; ")})`);
+  return `<buying_group product_personas="Curinos persona map">\nUse this to name the roles in "Who to engage": match named contacts from the research to these roles, and for any role with no named contact, say which title to find.\n${lines.join("\n")}\n</buying_group>`;
 }
 
 export type PlanResult = { text: string; inputTokens: number; outputTokens: number; costUsd: number; error?: string };
