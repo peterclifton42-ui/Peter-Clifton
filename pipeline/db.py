@@ -8,14 +8,18 @@ bypasses row-level security, so it lives only there and in Vercel.
     python3 pipeline/db.py check                    # can we reach the database?
     python3 pipeline/db.py queue                     # institutions due a refresh, best first
     python3 pipeline/db.py institution <slug>
-    python3 pipeline/db.py start <refresh|weekly> [slug] "<note>"     # prints the run id
+    python3 pipeline/db.py start <refresh|weekly|daily> [slug] "<note>"     # prints the run id
     python3 pipeline/db.py finish <run id> <published|skipped|failed|done> "<note>"
     python3 pipeline/db.py events-due                # passed dates not yet marked reported
     python3 pipeline/db.py events-upcoming [days]    # unconfirmed earnings dates coming up (default 21)
     python3 pipeline/db.py events-latest             # each institution's latest period
     python3 pipeline/db.py set-event <slug> "<period>" [--date D] [--status S] [--kind K] [--source URL] [--note TEXT]
     python3 pipeline/db.py news-targets [n]          # most-followed institutions (default 15)
-    python3 pipeline/db.py add-news <slug> <YYYY-MM-DD> "<headline>" "<summary>" "<source name>" <url> --tag <earnings|strategy|digital|partnership|risk> --angle "<sales angle>"
+    python3 pipeline/db.py add-news <slug> <YYYY-MM-DD> "<headline>" "<summary>" "<source name>" <url> --tag <earnings|strategy|digital|partnership|risk> --angle "<sales angle>" [--important]
+    python3 pipeline/db.py daily-news-targets        # followed institutions, with their latest news date
+    python3 pipeline/db.py brief-context <slug>      # everything needed to write the seller summary (pipeline/BRIEF.md)
+    python3 pipeline/db.py set-brief <slug> <brief.json> <refresh|news|backfill>  # save the seller summary
+    python3 pipeline/db.py briefs-due [n]            # institutions whose summary is missing or older than their dashboard
 
     python3 pipeline/db.py new-queue                 # requested new institutions, oldest first
     python3 pipeline/db.py new-start <request id>    # claim one for this run
@@ -90,7 +94,7 @@ def main():
     sub.add_parser("check")
     sub.add_parser("queue")
     p = sub.add_parser("institution"); p.add_argument("slug")
-    p = sub.add_parser("start"); p.add_argument("job", choices=["refresh", "weekly"]); p.add_argument("rest", nargs="+")
+    p = sub.add_parser("start"); p.add_argument("job", choices=["refresh", "weekly", "daily"]); p.add_argument("rest", nargs="+")
     p = sub.add_parser("finish"); p.add_argument("id", type=int)
     p.add_argument("status", choices=["published", "skipped", "failed", "done"]); p.add_argument("note")
     sub.add_parser("events-due")
@@ -105,6 +109,11 @@ def main():
         p.add_argument(name)
     p.add_argument("--tag", choices=["earnings", "strategy", "digital", "partnership", "risk"], default="strategy")
     p.add_argument("--angle", help="one sentence on how a seller could use it")
+    p.add_argument("--important", action="store_true", help="results, M&A, leadership, regulatory/credit risk, ratings or a major strategy move")
+    sub.add_parser("daily-news-targets")
+    p = sub.add_parser("brief-context"); p.add_argument("slug")
+    p = sub.add_parser("set-brief"); p.add_argument("slug"); p.add_argument("file"); p.add_argument("trigger", choices=["refresh", "news", "backfill"])
+    p = sub.add_parser("briefs-due"); p.add_argument("n", nargs="?", type=int, default=10)
     sub.add_parser("new-queue")
     p = sub.add_parser("new-start"); p.add_argument("id", type=int)
     p = sub.add_parser("new-live"); p.add_argument("id", type=int); p.add_argument("slug")
@@ -176,8 +185,38 @@ def main():
         row = request("POST", "news_items", {
             "slug": a.slug, "published_on": a.date, "headline": a.headline, "summary": a.summary,
             "source_name": a.source_name, "url": a.url, "tag": a.tag, "sales_angle": (a.angle or "").strip() or None,
+            "importance": "high" if a.important else "normal",
         }, params={"on_conflict": "slug,headline"}, prefer="resolution=ignore-duplicates,return=representation")
         out({"added": bool(row)})
+    elif a.cmd == "daily-news-targets":
+        follows = request("GET", "favourites", params={"select": "slug"}) or []
+        counts = {}
+        for f in follows:
+            counts[f["slug"]] = counts.get(f["slug"], 0) + 1
+        if not counts:
+            out([])
+            return
+        insts = request("GET", "institutions", params={"select": "slug,name,ticker,hq", "slug": f"in.({','.join(counts)})"})
+        news = request("GET", "news_items", params={"select": "slug,published_on", "slug": f"in.({','.join(counts)})", "order": "published_on.desc"}) or []
+        last = {}
+        for n in news:
+            last.setdefault(n["slug"], n["published_on"])
+        insts.sort(key=lambda i: (-counts[i["slug"]], i["name"]))
+        out([{**i, "followers": counts[i["slug"]], "latest_news": last.get(i["slug"])} for i in insts])
+    elif a.cmd == "brief-context":
+        out(brief_context(a.slug))
+    elif a.cmd == "set-brief":
+        out(set_brief(a.slug, a.file, a.trigger))
+    elif a.cmd == "briefs-due":
+        insts = request("GET", "institutions", params={"select": "slug,name,current_snapshot_id", "current_snapshot_id": "not.is.null"})
+        briefs = {b["slug"]: b for b in request("GET", "bank_briefs", params={"select": "slug,snapshot_id,written_at"}) or []}
+        follows = request("GET", "favourites", params={"select": "slug"}) or []
+        counts = {}
+        for f in follows:
+            counts[f["slug"]] = counts.get(f["slug"], 0) + 1
+        due = [i for i in insts if i["slug"] not in briefs or briefs[i["slug"]]["snapshot_id"] != i["current_snapshot_id"]]
+        due.sort(key=lambda i: (i["slug"] in briefs, -counts.get(i["slug"], 0), i["name"]))
+        out([{"slug": i["slug"], "name": i["name"], "has_brief": i["slug"] in briefs, "followers": counts.get(i["slug"], 0)} for i in due[:a.n]])
     elif a.cmd == "new-queue":
         out(rpc("pipeline_new_institution_queue"))
     elif a.cmd == "new-start":
@@ -201,6 +240,77 @@ def main():
         request("POST", "peer_groups", {"slug": a.slug, "source": a.source, "source_url": a.url, "year": a.year, "peers": peers, "collected_at": now()},
                 params={"on_conflict": "slug"}, prefer="resolution=merge-duplicates")
         out({"slug": a.slug, "peers": len(peers), "covered": [p["slug"] for p in peers if p["slug"]]})
+
+
+# The full report's tabs and the section ids a summary action may link to
+# (lib/dashboard-tabs.ts keeps the same list for the app).
+DASHBOARD_SECTIONS = {
+    "Financial Overview": ["fo-theme", "fo-metrics", "fo-charts", "fo-nii", "fo-fees"],
+    "Organisation & People": ["op-overview", "op-leadership", "op-structure", "op-market", "op-silo", "op-targets"],
+    "Balance Sheet & Funding": ["bs-funding", "bs-deposit-mix", "bs-loans", "bs-maturity", "bs-sales", "bs-suite"],
+    "Strategy & Health": ["sh-themes", "sh-pillars", "sh-swot", "sh-timing"],
+    "Analytics & Technology": ["at-angle", "at-dii", "at-gaps", "at-maturity", "at-platforms"],
+    "Peer Comparison": ["pc-snapshot", "pc-table", "pc-nim", "pc-deposit", "pc-efficiency", "pc-leads", "pc-watchlist"],
+    "Product Fit & Playbook": ["pp-plan", "pp-valueprops", "pp-discovery", "pp-proofpoints", "pp-landmines", "pp-emails", "pp-agenda", "pp-calc"],
+    "Recent News": ["n-news", "n-press", "n-qa", "n-themes-analyst", "n-ratings", "n-timing"],
+}
+
+
+def brief_context(slug):
+    inst = request("GET", "institutions", params={"slug": f"eq.{slug}", "select": "slug,name,category,assets_b,latest_quarter,current_snapshot_id"})
+    if not inst or not inst[0]["current_snapshot_id"]:
+        sys.exit(f"No published dashboard for {slug}")
+    inst = inst[0]
+    snap = request("GET", "snapshots", params={"id": f"eq.{inst['current_snapshot_id']}", "select": (
+        "loaded_at,theme:data->finOverview->salesTheme,timing:data->salesTiming,angle:data->curinosAngle,"
+        "health:data->healthRating,swot:data->swot,metrics:data->metrics,products:data->products,execs:data->contacts->execs")})[0]
+    products = [{"name": p.get("name"), "priority": p.get("pri"), "fit": p.get("fit"), "why": p.get("why"), "talk": p.get("talk")}
+                for p in (snap.get("products") or [])]
+    execs = [{k: e.get(k) for k in ("name", "title", "insight", "relevance")} for e in (snap.get("execs") or [])]
+    news = request("GET", "news_items", params={"slug": f"eq.{slug}", "select": "published_on,headline,summary,sales_angle,importance",
+                                                "order": "published_on.desc", "limit": "10"})
+    official = request("GET", "regulatory_metrics", params={"slug": f"eq.{slug}", "select": "period,nim,deposit_cost,ldr,deposit_growth,efficiency,roa",
+                                                            "order": "period.desc", "limit": "2"})
+    ws = request("GET", "whitespace", params={"slug": f"eq.{slug}", "select": "product_slug,status,target_quarter,acv_usd,note"})
+    events = request("GET", "earnings_events", params={"slug": f"eq.{slug}", "select": "period,event_date,status,kind", "order": "event_date.desc", "limit": "3"})
+    current = request("GET", "bank_briefs", params={"slug": f"eq.{slug}", "select": "situation,actions,written_at"})
+    return {
+        "institution": {k: inst[k] for k in ("slug", "name", "category", "assets_b", "latest_quarter")},
+        "researched_at": snap["loaded_at"], "sales_theme": snap.get("theme"), "health": snap.get("health"),
+        "timing": snap.get("timing"), "curinos_angle": snap.get("angle"), "swot": snap.get("swot"), "metric_cards": snap.get("metrics"),
+        "products": products, "executives": execs, "news": news, "official_metrics": official, "whitespace": ws,
+        "calendar": events, "current_brief": current[0] if current else None, "report_sections": DASHBOARD_SECTIONS,
+    }
+
+
+def set_brief(slug, path, trigger):
+    with open(path) as f:
+        b = json.load(f)
+    situation = (b.get("situation") or "").strip()
+    actions = b.get("actions") or []
+    problems = []
+    if not 200 <= len(situation) <= 1200:
+        problems.append(f"situation must be 200-1200 characters (is {len(situation)})")
+    if len(actions) != 3:
+        problems.append(f"exactly 3 actions needed (got {len(actions)})")
+    for i, act in enumerate(actions, 1):
+        if not (act.get("title") or "").strip() or not (act.get("why") or "").strip():
+            problems.append(f"action {i} needs a title and a why")
+        tab, at = act.get("tab"), act.get("at")
+        if tab is not None and tab not in DASHBOARD_SECTIONS:
+            problems.append(f"action {i}: unknown tab {tab!r}")
+        elif at is not None and (tab is None or at not in DASHBOARD_SECTIONS[tab]):
+            problems.append(f"action {i}: section {at!r} is not on tab {tab!r}")
+    if problems:
+        sys.exit("Brief not saved: " + "; ".join(problems))
+    inst = request("GET", "institutions", params={"slug": f"eq.{slug}", "select": "current_snapshot_id"})
+    if not inst:
+        sys.exit(f"Unknown institution {slug}")
+    row = {"slug": slug, "situation": situation, "trigger": trigger, "snapshot_id": inst[0]["current_snapshot_id"],
+           "actions": [{"title": x["title"].strip(), "why": x["why"].strip(), "tab": x.get("tab"), "at": x.get("at")} for x in actions],
+           "news_through": today(), "written_at": now()}
+    request("POST", "bank_briefs", row, params={"on_conflict": "slug"}, prefer="resolution=merge-duplicates")
+    return {"saved": slug, "trigger": trigger}
 
 
 # Same matching as lib/requests.ts: corporate suffixes stripped, whole-word containment.

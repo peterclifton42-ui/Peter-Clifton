@@ -28,11 +28,13 @@ Never mark something reported without a source.
 
 ## Part 2 — News (about 15 calls)
 
-`python3 pipeline/db.py news-targets` lists up to 15 institutions, most-followed first. For each one, make one WebSearch: `"<name>" news <current month> <year>`. Keep at most 3 items from the last 14 days that a seller would care about: results, deals, leadership changes, launches, branch moves, regulatory actions and analyst rating changes. Skip stock-price noise and listicles.
+Banks that sellers follow get their news every day from the daily news job (`pipeline/DAILY_TASK.md`), so this part covers the rest. `python3 pipeline/db.py news-targets 40` lists institutions, most-followed first; skip any that `python3 pipeline/db.py daily-news-targets` lists, and take the first 15 of the others. For each one, make one WebSearch: `"<name>" news <current month> <year>`. Keep at most 3 items from the last 14 days that a seller would care about: results, deals, leadership changes, launches, branch moves, regulatory actions and analyst rating changes. Skip stock-price noise and listicles.
 
 Add each item:
 
-`python3 pipeline/db.py add-news <slug> <YYYY-MM-DD> "<headline as published>" "<one plain sentence on why it matters to a seller>" "<publisher>" <url> --tag <tag> --angle "<sales angle>"`
+`python3 pipeline/db.py add-news <slug> <YYYY-MM-DD> "<headline as published>" "<one plain sentence on why it matters to a seller>" "<publisher>" <url> --tag <tag> --angle "<sales angle>" [--important]`
+
+- `--important` marks news a seller must know before the next call: results and guidance, M&A, leadership changes (C-suite or business-line heads), regulatory or credit-risk issues, rating changes and major strategy moves (a new market, a big technology programme, branch closures). Leave it off routine items: awards, community news, small hires, product promotions.
 
 - `--tag` is one of `earnings` (results, guidance, analyst ratings), `strategy` (M&A, leadership, branches, pricing moves), `digital` (technology, apps, product launches), `partnership` (vendors, fintechs, other banks) or `risk` (regulatory actions, credit or legal issues).
 - `--angle` is one sentence on how a Curinos seller could use the item in a conversation. Stick to the facts in the article; make no product claims. For a credit union, say members, not customers.

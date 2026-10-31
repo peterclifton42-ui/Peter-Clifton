@@ -79,7 +79,7 @@ export default async function AdminPage() {
                 {(runs ?? []).map((r) => (
                   <tr key={r.id}>
                     <td className="when">{new Date(r.started_at).toLocaleString("en-US", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</td>
-                    <td>{r.job === "weekly" ? "Weekly calendar and news" : r.slug ? names.get(r.slug) ?? r.slug : "Refresh"}</td>
+                    <td>{r.job === "weekly" ? "Weekly calendar and news" : r.job === "daily" ? "Daily news" : r.slug ? names.get(r.slug) ?? r.slug : "Refresh"}</td>
                     <td><span className={`badge run-${r.status}`}>{r.status}</span></td>
                     <td className="dim" colSpan={2}>{r.note}</td>
                   </tr>

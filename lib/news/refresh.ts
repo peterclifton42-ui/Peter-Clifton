@@ -30,8 +30,9 @@ const SAVE_NEWS: Anthropic.Beta.BetaTool = {
             url: { type: "string", description: "The article URL exactly as found" },
             tag: { type: "string", enum: ["earnings", "strategy", "digital", "partnership", "risk"], description: "What kind of news it is" },
             sales_angle: { type: "string", description: "One sentence on how a Curinos seller could use it in a conversation (no product claims beyond the facts)" },
+            important: { type: "boolean", description: "True for results, M&A, leadership changes, regulatory or credit-risk issues, ratings actions and major strategy moves; false for routine items (awards, community news, small hires, product promotions)" },
           },
-          required: ["published_on", "headline", "summary", "source_name", "url", "tag", "sales_angle"],
+          required: ["published_on", "headline", "summary", "source_name", "url", "tag", "sales_angle", "important"],
           additionalProperties: false,
         },
       },
@@ -41,7 +42,7 @@ const SAVE_NEWS: Anthropic.Beta.BetaTool = {
   },
 };
 
-type Item = { published_on: string; headline: string; summary: string; source_name: string; url: string; tag: string; sales_angle: string };
+type Item = { published_on: string; headline: string; summary: string; source_name: string; url: string; tag: string; sales_angle: string; important?: boolean };
 const TAGS = ["earnings", "strategy", "digital", "partnership", "risk"];
 
 // Why an item can't be saved, or null if it can. Dates may come back with a time
@@ -129,6 +130,7 @@ When done, call save_news once with the items.`,
         slug, published_on: i.published_on, headline: i.headline.trim(), summary: i.summary.trim(),
         source_name: i.source_name.trim(), url: i.url,
         tag: TAGS.includes(i.tag) ? i.tag : "strategy", sales_angle: i.sales_angle?.trim() || null,
+        importance: i.important ? "high" : "normal",
       }, { onConflict: "slug,headline", ignoreDuplicates: true }).select("id");
       added += data?.length ?? 0;
     }

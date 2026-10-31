@@ -982,3 +982,54 @@ button.convert-not_fit, button.convert-roll { color: var(--muted); }
 @media print {
   .topbar, .plan-bar, .crumbs, .convert { display: none !important; }
 }
+
+/* ---------- Bank Summary ---------- */
+.good-text { color: var(--good); }
+.bad-text { color: var(--bad); }
+.summary-page { max-width: 1200px; }
+.sum-hero { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+.sum-hero h1 { font-size: 26px; }
+.sum-theme { margin: 6px 0 0; font-size: 16px; color: var(--text); max-width: 760px; }
+.sum-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; margin-bottom: 16px; }
+.sum-grid.even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.sum-grid > .panel, .sum-side > .panel { margin-bottom: 0; }
+.sum-side { display: grid; gap: 16px; }
+@media (max-width: 900px) { .sum-grid, .sum-grid.even { grid-template-columns: minmax(0, 1fr); } }
+.sum-situation p { font-size: 15px; line-height: 1.6; margin: 0 0 10px; }
+.sum-do-head { margin-top: 18px !important; margin-bottom: 10px !important; }
+ol.sum-actions { list-style: none; counter-reset: act; margin: 0; padding: 0; display: grid; gap: 10px; }
+ol.sum-actions li { counter-increment: act; position: relative; padding: 12px 14px 12px 50px; border-radius: 10px; background: var(--bg); border: 1px solid var(--border); }
+ol.sum-actions li::before { content: counter(act); position: absolute; left: 14px; top: 12px; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+ol.sum-actions b { color: var(--text-strong); font-size: 15px; }
+ol.sum-actions p { margin: 4px 0 6px; font-size: 14px; line-height: 1.5; }
+ol.sum-actions a { font-size: 13px; font-weight: 600; }
+table.sum-metrics { width: 100%; min-width: 0; border-collapse: collapse; font-size: 14px; }
+table.sum-metrics tbody tr { cursor: default; }
+table.sum-metrics tbody tr:hover td { background: none; }
+table.sum-metrics th, table.sum-metrics td { padding: 7px 4px; border-bottom: 1px solid var(--border); text-align: left; }
+table.sum-metrics thead th { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+table.sum-metrics tbody th { font-weight: 500; font-size: 14px; color: var(--text); cursor: help; text-transform: none; letter-spacing: 0; white-space: normal; }
+table.sum-metrics .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.sum-metrics td b, table.sum-metrics td span { font-weight: 600; }
+.sum-move { font-size: 10px; margin-left: 4px; }
+.sum-dates ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+.sum-dates .dim { display: inline-block; min-width: 110px; }
+.sum-pursuits { margin: 0 0 8px; font-size: 14px; }
+ul.sum-plays, ul.sum-people { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 10px; }
+ul.sum-plays li > div { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+ul.sum-plays p, ul.sum-people p { margin: 4px 0 0; font-size: 13.5px; line-height: 1.5; }
+ul.sum-people li { padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+ul.sum-people li:last-child { border-bottom: 0; }
+ul.sum-people b { color: var(--text-strong); }
+
+/* News feed (bank Summary and Home) */
+ul.news-feed { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+ul.news-feed li { display: grid; grid-template-columns: 82px 1fr; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+ul.news-feed li:last-child { border-bottom: 0; }
+ul.news-feed .when { color: var(--muted); font-size: 12.5px; padding-top: 2px; white-space: nowrap; }
+ul.news-feed a, ul.news-feed b { color: var(--text-strong); font-weight: 600; }
+ul.news-feed p { margin: 3px 0 0; font-size: 13.5px; }
+.news-angle { color: var(--accent-text); }
+.news-angle::before { content: "Why it matters: "; color: var(--muted); }
+.news-flag { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 50%, transparent); border-radius: 4px; padding: 0 5px; margin-right: 6px; vertical-align: 1px; }
+ul.news-feed a.news-bank { color: var(--muted); font-weight: 500; font-size: 12.5px; margin-right: 6px; }

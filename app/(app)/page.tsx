@@ -87,6 +87,18 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const pursuitAcv = pursuitRows.reduce((t, r) => t + Number(r.acv_usd ?? 0), 0);
   const overdueCount = pursuitRows.filter((r) => r.target_quarter! < thisQuarter).length;
 
+  // Noteworthy news at the banks the seller follows: important items first, last 30 days.
+  const { data: feedRows } = followed.size
+    ? await supabase.from("news_items").select("slug, published_on, headline, summary, url, sales_angle, importance")
+      .in("slug", [...followed]).gte("published_on", addDays(today, -30))
+      .order("published_on", { ascending: false }).limit(40)
+    : { data: [] };
+  type FeedItem = { slug: string; published_on: string; headline: string; summary: string | null; url: string | null; sales_angle: string | null; importance: string };
+  const feed = ((feedRows ?? []) as FeedItem[]);
+  const feedShown = [...feed.filter((n) => n.importance === "high"), ...feed.filter((n) => n.importance !== "high")].slice(0, 6)
+    .sort((a, b) => (a.importance === "high" ? 0 : 1) - (b.importance === "high" ? 0 : 1) || b.published_on.localeCompare(a.published_on));
+  const importantCount = feed.filter((n) => n.importance === "high").length;
+
   const plays = nextPlays((research ?? []) as InsightInput[], allWs, 3);
   const playSource = wsSlugs.length ? "your book" : followed.size ? "the banks you follow" : "high-opportunity banks";
 
@@ -175,6 +187,30 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             </p>
           )}
           <p className="dim small">Record every move with <b>Move to pipeline</b>, <b>Won</b> or <b>Lost</b> so it shows in <Link href="/whitespace#conversion">conversion reporting</Link>.</p>
+        </section>
+      )}
+
+      {followed.size > 0 && (
+        <section className="panel">
+          <div className="panel-head">
+            <h2>News at your banks</h2>
+            <span className="dim small">Last 30 days{importantCount ? ` · ${importantCount} important` : ""}</span>
+          </div>
+          {feedShown.length ? (
+            <ul className="news-feed">
+              {feedShown.map((n, i) => (
+                <li key={i} className={n.importance === "high" ? "important" : undefined}>
+                  <span className="when">{formatDay(n.published_on)}</span>
+                  <div>
+                    {n.importance === "high" && <span className="news-flag">Important</span>}
+                    <Link href={`/banks/${n.slug}`} className="news-bank">{bySlug.get(n.slug)?.name ?? n.slug}</Link>
+                    {n.url ? <a href={n.url} target="_blank" rel="noreferrer">{n.headline}</a> : <b>{n.headline}</b>}
+                    {n.sales_angle ? <p className="news-angle">{n.sales_angle}</p> : n.summary ? <p className="dim">{n.summary}</p> : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="dim">No news at your banks in the last 30 days. News is collected every day for followed banks.</p>}
         </section>
       )}
 
