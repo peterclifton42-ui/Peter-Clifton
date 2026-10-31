@@ -60,6 +60,14 @@ Roles: **pending** (signed up but no access), **seller** (can see everything), *
 - **Daily news job** (scheduled task "Bank Intelligence — daily news", `pipeline/DAILY_TASK.md`): one search per followed institution every day, then rewrites the summary of any bank with important news. The weekly job covers the institutions nobody follows.
 - **Peers in the research**: banks now source 2 peers by hand (for loan yield, deposits per branch and service charges, which call reports don't carry); credit unions keep 4. Official peer comparisons come from Compare.
 
+## Personas and Clay
+
+- **`lib/personas.ts`** maps every catalogue product to the roles in a deal: **economic buyer**, **champion**, **users** and **influencers**. Each persona has typical titles (banks and credit unions), job-title keywords to include and exclude, seniority, department and notes on how the role changes with size. 11 personas are Curinos's own (curinos.com/who-we-help), and `SITE` records which products each of those pages ties to the persona; those are badged "curinos.com". The rest is a draft awaiting Product Marketing review: add a product's slug to `REVIEWED` once it has been checked.
+- **Product pages → Who to target** shows the map, with three Clay downloads: priority 1–2 targets, your book, and every institution the product fits.
+- **Bank Summary → Who to call → download for Clay**: the personas for that bank's priority 1–2 products.
+- **The CSV** (`/api/clay`) has one row per institution × persona: company name and website domain (from the research), type, assets, HQ, product, priority and fit, role, persona, titles (credit-union titles for credit unions), include/exclude keywords, seniority, department, the people the research already names for that persona, the source and the app link. Products the team has marked client, not a fit or recently lost are left out.
+- Engagement plans use the map to name the whole buying group.
+
 ## Ask
 
 `/ask`, plus "Ask about this bank/product" on every bank and product page, is a chat assistant (Claude Opus 5.5 through the Claude API). It answers only from the app's own data, using read-only tools in `lib/ask/tools.ts` that run as the signed-in seller, so row-level security applies:

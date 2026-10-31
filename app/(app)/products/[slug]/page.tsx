@@ -13,6 +13,7 @@ import { STATUS_KEYS, WHITESPACE_COLUMNS, formatQuarter, formatUsd, lostExpired,
 import { StatusPill } from "../../whitespace/editor";
 import { AskDrawer } from "../../ask/ask-chat";
 import { ScopeTabs } from "../../scope-tabs";
+import { WhoToTarget } from "./personas";
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ scope?: string }> };
 
@@ -219,6 +220,8 @@ export default async function ProductPage({ params, searchParams }: Props) {
           </section>
         </aside>
       </div>
+
+      <WhoToTarget productSlug={product.slug} productName={product.name} />
     </main>
   );
 }

@@ -231,6 +231,9 @@ export default async function BankSummaryPage({ params }: Props) {
                   ))}
                 </ul>
               ) : <p className="dim">No named contacts in the research yet.</p>}
+              <p className="dim small sum-clay">
+                Find the rest of the buying group: <a href={`/api/clay?bank=${slug}`} download>download for Clay</a> (the personas for this bank&apos;s priority 1–2 products, with its website domain).
+              </p>
             </section>
           </div>
         </div>
