@@ -37,6 +37,8 @@ The queue lists institutions whose latest published results are newer than their
 - **Empty list:** don't record a run. Instead catch up on seller summaries: run `python3 pipeline/db.py briefs-due 3` and, for each institution it lists, write its summary by following `pipeline/BRIEF.md` with trigger `backfill` (no web calls; everything comes from `brief-context`). Then stop, with a one-line summary such as "Queue empty; wrote 3 summaries". If `briefs-due` is empty too, just stop: that is a correct outcome.
 - **Otherwise, claim it:** `python3 pipeline/db.py start refresh <slug> "Researching <period> results"`. Keep the printed `run_id` as the RUN ID.
 
+**A confirmed results date that has passed is queued even before the calendar says "reported".** If, after one or two searches, the release for that period is not out yet, don't research: run `python3 pipeline/db.py set-event <slug> "<period>" --date <announced date, or a week later>`, then `python3 pipeline/db.py finish <RUN ID> skipped "<period> release not out yet; date moved"` and stop. If it is out, also mark it: `python3 pipeline/db.py set-event <slug> "<period>" --status reported --source <release URL>`.
+
 To see what the institution is: `python3 pipeline/db.py institution <slug>`. Keep the same slug; the app tracks it by that.
 
 ## Step 2 — Read the method
