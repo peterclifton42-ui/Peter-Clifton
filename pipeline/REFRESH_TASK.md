@@ -1,6 +1,6 @@
 # Refresh task — research one institution and publish its new dashboard
 
-Runs unattended every two hours (scheduled task "Bank Intelligence — refresh one dashboard"), so earnings-season backlogs clear in a day or two; when nothing is due it exits in a minute. Fresh session: decide everything yourself and never ask questions. This replaces the old Run A / Run B pair. The research half is Run A's routine, unchanged. The publish half is now a single command, and there is no email to Curinos: the app is the delivery.
+Runs unattended every four hours (scheduled task "Bank Intelligence — refresh one dashboard"), so earnings-season backlogs clear in a few days; when nothing is due it exits in a minute. Fresh session: decide everything yourself and never ask questions. This replaces the old Run A / Run B pair. The research half is Run A's routine, unchanged. The publish half is now a single command, and there is no email to Curinos: the app is the delivery.
 
 Repository: `/home/user/Peter-Clifton` (if it is missing, `git clone https://github.com/peterclifton42-ui/Peter-Clifton` there). Database: the Supabase project `bank-intelligence`, reached only through `python3 pipeline/db.py …` (and `pipeline/publish.py`). Both use the `SUPABASE_SECRET_KEY` environment variable. Run `python3 pipeline/db.py check` first: if it says the key is not set, stop and report exactly that.
 
@@ -11,7 +11,7 @@ Repository: `/home/user/Peter-Clifton` (if it is missing, `git clone https://git
 ## Step 0 — Set up and guard
 
 1. `cd /home/user/Peter-Clifton && git pull -q origin main && python3 pipeline/db.py check`.
-2. Run `date -u`. You fire every two hours at 7 minutes past (00:07, 02:07, … 22:07 UTC). If it is more than 90 minutes past the latest of those slots, you are a stalled session that resumed late: do nothing and stop.
+2. Run `date -u`. You fire every four hours at 7 minutes past (00:07, 04:07, 08:07, 12:07, 16:07, 20:07 UTC). If it is more than 90 minutes past the latest of those slots, you are a stalled session that resumed late: do nothing and stop.
 3. Make a working folder, `mkdir -p /tmp/refresh && cd /tmp/refresh`, and copy into it:
    - `reference/score_v4.py`
    - `reference/claude/bank-benchmark-2026Q2.json`. Use a newer `bank-benchmark-*.json` instead if `reference/claude/` has one. Keep the file name; the scorer finds it by that name.
@@ -33,6 +33,8 @@ python3 pipeline/db.py queue
 ```
 
 The queue lists institutions whose latest published results are newer than their dashboard, plus any institution a seller asked to refresh (the "Request full refresh" button, which works on any bank). Requested ones come first, then most-followed, then oldest results first. A requested bank may already have its latest results in the dashboard: research it fully anyway, using the latest reported quarter (`period` may be empty if no results are recorded; then use the latest quarter you can source). It leaves out anything another run claimed in the last 6 hours. Take the **first** entry.
+
+A bank whose refresh failed in the last 24 hours is left out of the list, so a bank whose filings aren't out yet can't block the queue; it is retried the next day.
 
 - **Empty list:** don't record a run. Instead catch up on seller summaries: run `python3 pipeline/db.py briefs-due 3` and, for each institution it lists, write its summary by following `pipeline/BRIEF.md` with trigger `backfill` (no web calls; everything comes from `brief-context`). Then stop, with a one-line summary such as "Queue empty; wrote 3 summaries". If `briefs-due` is empty too, just stop: that is a correct outcome.
 - **Otherwise, claim it:** `python3 pipeline/db.py start refresh <slug> "Researching <period> results"`. Keep the printed `run_id` as the RUN ID.
