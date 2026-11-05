@@ -1,6 +1,6 @@
 # Refresh task — research one institution and publish its new dashboard
 
-Runs unattended every four hours (scheduled task "Bank Intelligence — refresh one dashboard"), so earnings-season backlogs clear in a few days; when nothing is due it exits in a minute. Fresh session: decide everything yourself and never ask questions. This replaces the old Run A / Run B pair. The research half is Run A's routine, unchanged. The publish half is now a single command, and there is no email to Curinos: the app is the delivery.
+Runs unattended (scheduled task "Bank Intelligence — refresh one dashboard") every four hours in earnings season, so backlogs clear in a few days, and twice a day otherwise; when nothing is due it exits in a minute. Fresh session: decide everything yourself and never ask questions. This replaces the old Run A / Run B pair. The research half is Run A's routine, unchanged. The publish half is now a single command, and there is no email to Curinos: the app is the delivery.
 
 Repository: `/home/user/Peter-Clifton` (if it is missing, `git clone https://github.com/peterclifton42-ui/Peter-Clifton` there). Database: the Supabase project `bank-intelligence`, reached only through `python3 pipeline/db.py …` (and `pipeline/publish.py`). Both use the `SUPABASE_SECRET_KEY` environment variable. Run `python3 pipeline/db.py check` first: if it says the key is not set, stop and report exactly that.
 
@@ -11,7 +11,7 @@ Repository: `/home/user/Peter-Clifton` (if it is missing, `git clone https://git
 ## Step 0 — Set up and guard
 
 1. `cd /home/user/Peter-Clifton && git pull -q origin main && python3 pipeline/db.py check`.
-2. Run `date -u`. You fire every four hours at 7 minutes past (00:07, 04:07, 08:07, 12:07, 16:07, 20:07 UTC). If it is more than 90 minutes past the latest of those slots, you are a stalled session that resumed late: do nothing and stop.
+2. Run `date -u`. You fire at 7 minutes past 00:00 and 12:00 UTC, and in earnings season also at 04:07, 08:07, 16:07 and 20:07. If it is more than 90 minutes past the latest of those slots, you are a stalled session that resumed late: do nothing and stop.
 3. Make a working folder, `mkdir -p /tmp/refresh && cd /tmp/refresh`, and copy into it:
    - `reference/score_v4.py`
    - `reference/claude/bank-benchmark-2026Q2.json`. Use a newer `bank-benchmark-*.json` instead if `reference/claude/` has one. Keep the file name; the scorer finds it by that name.
